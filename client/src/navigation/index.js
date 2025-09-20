@@ -4,7 +4,7 @@ import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -44,8 +44,10 @@ const UserTabNavigator = () => {
                     } else if (route.name === SCREENS.PROFILE) {
                         iconName = focused ? 'person' : 'person-outline';
                     } else if (route.name === SCREENS.CHATBOT) {
+                        iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+                    } else if (route.name === SCREENS.MESSAGE) {
                         iconName = focused ? 'chatbox' : 'chatbox-outline';
-                    }
+                    } 
                     
                     return <Ionicons name={iconName} size={size} color={color} />;
                 },
@@ -64,14 +66,14 @@ const UserTabNavigator = () => {
                 name={SCREENS.HOME}
                 component={Home}
                 options={{
-                    tabBarLabel: 'Home',
+                    tabBarLabel: 'Diễn đàn',
                 }}
             />
             <Tab.Screen
                 name={SCREENS.MYPOSTS}
                 component={MyPostsStackNavigator}
                 options={{
-                    tabBarLabel: 'My Posts',
+                    tabBarLabel: 'Bài viết',
                 }}
             />
             <Tab.Screen
@@ -82,10 +84,17 @@ const UserTabNavigator = () => {
                 }}
             />
             <Tab.Screen
+                name={SCREENS.MESSAGE}
+                component={Message}
+                options={{
+                    tabBarLabel: 'Tin nhắn',
+                }}
+            />
+            <Tab.Screen
                 name={SCREENS.PROFILE}
                 component={Profile}
                 options={{
-                    tabBarLabel: 'Profile',
+                    tabBarLabel: 'Hồ sơ',
                 }}
             />
         </Tab.Navigator>

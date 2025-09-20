@@ -97,7 +97,6 @@ const MyPosts = ({ navigation }) => {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.title}>Bài đăng</Text>
-                <Text style={styles.subtitle}>Các bài viết và câu hỏi của bạn</Text>
             </View>
 
             {/* Tabs */}

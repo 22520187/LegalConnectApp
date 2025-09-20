@@ -4,6 +4,11 @@ export { default as QuestionCard } from './QuestionCard/QuestionCard';
 export { default as QuestionList } from './QuestionList/QuestionList';
 export { default as FloatingActionButton } from './FloatingActionButton/FloatingActionButton';
 
+// Chat components
+export { default as ChatMessage } from './ChatMessage/ChatMessage';
+export { default as ChatInput } from './ChatInput/ChatInput';
+export { default as PDFPicker } from './PDFPicker/PDFPicker';
+
 // Profile components
 export { default as ProfileSection } from './Account/ProfileSection';
 export { default as ProfileAvatar } from './Account/ProfileAvatar';
