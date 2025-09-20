@@ -15,19 +15,30 @@ const QuestionList = ({
   onRefresh, 
   refreshing, 
   onLoadMore,
-  loading 
+  loading,
+  emptyState 
 }) => {
   const renderQuestion = ({ item }) => (
     <QuestionCard question={item} onPress={onQuestionPress} />
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>📝</Text>
-      <Text style={styles.emptyTitle}>No questions yet</Text>
-      <Text style={styles.emptyText}>Be the first to ask a legal question!</Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    const defaultEmpty = {
+      icon: '📝',
+      title: 'No questions yet',
+      text: 'Be the first to ask a legal question!'
+    };
+    
+    const empty = emptyState || defaultEmpty;
+    
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyIcon}>{empty.icon}</Text>
+        <Text style={styles.emptyTitle}>{empty.title}</Text>
+        <Text style={styles.emptyText}>{empty.text}</Text>
+      </View>
+    );
+  };
 
   const renderFooter = () => {
     if (!loading) return null;
