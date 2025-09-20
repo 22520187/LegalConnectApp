@@ -4,7 +4,7 @@ import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -15,6 +15,15 @@ function AuthStackNavigator() {
         <Stack.Navigator initialRouteName={SCREENS.LOGIN} screenOptions={{ headerShown: false }}>
             <Stack.Screen name={SCREENS.LOGIN} component={Login} />
             <Stack.Screen name={SCREENS.SIGNUP} component={SignUp} />
+        </Stack.Navigator>
+    );
+}
+
+function MyPostsStackNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MyPostsList" component={MyPosts} />
+            <Stack.Screen name={SCREENS.ASKQUESTION} component={AskQuestion} />
         </Stack.Navigator>
     );
 }
@@ -34,6 +43,8 @@ const UserTabNavigator = () => {
                         iconName = focused ? 'document-text' : 'document-text-outline';
                     } else if (route.name === SCREENS.PROFILE) {
                         iconName = focused ? 'person' : 'person-outline';
+                    } else if (route.name === SCREENS.CHATBOT) {
+                        iconName = focused ? 'chatbox' : 'chatbox-outline';
                     }
                     
                     return <Ionicons name={iconName} size={size} color={color} />;
@@ -58,9 +69,16 @@ const UserTabNavigator = () => {
             />
             <Tab.Screen
                 name={SCREENS.MYPOSTS}
-                component={MyPosts}
+                component={MyPostsStackNavigator}
                 options={{
                     tabBarLabel: 'My Posts',
+                }}
+            />
+            <Tab.Screen
+                name={SCREENS.CHATBOT}
+                component={ChatBot}
+                options={{
+                    tabBarLabel: 'ChatBot',
                 }}
             />
             <Tab.Screen
