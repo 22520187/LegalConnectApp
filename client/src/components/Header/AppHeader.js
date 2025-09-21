@@ -29,9 +29,8 @@ const AppHeader = ({ onSearch, onNotification, user }) => {
       {/* Logo and App Name */}
       <View style={styles.logoSection}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>LC</Text>
+          <Image source={require('../../../assets/logo.png')} style={styles.logo} />
         </View>
-        <Text style={styles.appName}>Legal Connect</Text>
       </View>
 
       {/* Action Icons */}
@@ -130,13 +129,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logoContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.BLUE,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
+    marginLeft: 18,
+  },
+  logo: {
+    width: 70,
+    height: 70,
+    resizeMode: 'contain',
   },
   logoText: {
     color: COLORS.WHITE,
