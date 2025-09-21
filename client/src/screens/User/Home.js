@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, FilterTabs, QuestionList, FloatingActionButton } from '../../components';
 import COLORS from '../../constant/colors';
 
-const Home = () => {
+const Home = ({ navigation }) => {
     const [activeTab, setActiveTab] = useState('newest');
     const [questions, setQuestions] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
@@ -137,7 +137,7 @@ const Home = () => {
     };
 
     const handleQuestionPress = (question) => {
-        Alert.alert('Question Details', `Opening question: ${question.title}`);
+        navigation.navigate('QuestionDetail', { question });
     };
 
     const handleRefresh = () => {
@@ -158,36 +158,52 @@ const Home = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <AppHeader
-                onSearch={handleSearch}
-                onNotification={handleNotification}
-                user={user}
+        <View style={styles.container}>
+            <StatusBar 
+                barStyle="dark-content" 
+                backgroundColor={COLORS.WHITE} 
+                translucent={false}
             />
-            
-            <FilterTabs
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-            />
-            
-            <QuestionList
-                questions={questions}
-                onQuestionPress={handleQuestionPress}
-                onRefresh={handleRefresh}
-                refreshing={refreshing}
-                onLoadMore={handleLoadMore}
-                loading={loading}
-            />
-            
-            <FloatingActionButton onPress={handleAddQuestion} />
-        </SafeAreaView>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <AppHeader
+                    onSearch={handleSearch}
+                    onNotification={handleNotification}
+                    user={user}
+                />
+                
+                <FilterTabs
+                    activeTab={activeTab}
+                    onTabChange={handleTabChange}
+                />
+                
+                <View style={styles.content}>
+                    <QuestionList
+                        questions={questions}
+                        onQuestionPress={handleQuestionPress}
+                        onRefresh={handleRefresh}
+                        refreshing={refreshing}
+                        onLoadMore={handleLoadMore}
+                        loading={loading}
+                    />
+                </View>
+                
+                <FloatingActionButton onPress={handleAddQuestion} />
+            </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: COLORS.WHITE,
+    },
+    safeArea: {
+        flex: 1,
         backgroundColor: COLORS.BG,
+    },
+    content: {
+        flex: 1,
     },
 });
 
