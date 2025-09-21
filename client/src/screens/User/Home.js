@@ -27,6 +27,7 @@ const Home = ({ navigation }) => {
             viewCount: 124,
             tags: ['Business Law', 'Startup', 'Vietnam'],
             author: {
+                id: 1,
                 name: 'Alice Johnson',
                 avatar: null,
             },
@@ -42,6 +43,7 @@ const Home = ({ navigation }) => {
             viewCount: 89,
             tags: ['Employment Law', 'Contract', 'Rights'],
             author: {
+                id: 2,
                 name: 'Mike Chen',
                 avatar: null,
             },
@@ -57,6 +59,7 @@ const Home = ({ navigation }) => {
             viewCount: 67,
             tags: ['IP Law', 'Software', 'Copyright'],
             author: {
+                id: 3,
                 name: 'Sarah Wilson',
                 avatar: null,
             },
@@ -72,6 +75,7 @@ const Home = ({ navigation }) => {
             viewCount: 45,
             tags: ['Real Estate', 'Contract Review', 'Property'],
             author: {
+                id: 4,
                 name: 'David Brown',
                 avatar: null,
             },
@@ -87,6 +91,7 @@ const Home = ({ navigation }) => {
             viewCount: 203,
             tags: ['Family Law', 'Divorce', 'Child Custody'],
             author: {
+                id: 5,
                 name: 'Emma Davis',
                 avatar: null,
             },
