@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
+import Toast from 'react-native-toast-message';
 
-const GenderSection = ({
+const BioSection = ({
   title,
   value,
   onSave,
@@ -11,15 +11,19 @@ const GenderSection = ({
   style
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedGender, setSelectedGender] = useState(value || 'Nam');
+  const [editValue, setEditValue] = useState(value || '');
 
   const handleSave = () => {
-    onSave(selectedGender);
+    onSave(editValue);
     setIsExpanded(false);
+    Toast.show({
+      type: 'success',
+      text1: `${title} đã được cập nhật thành công`
+    });
   };
 
   const handleCancel = () => {
-    setSelectedGender(value);
+    setEditValue(value || '');
     setIsExpanded(false);
   };
 
@@ -30,19 +34,17 @@ const GenderSection = ({
           {icon}
           <Text style={styles.title}>{title}</Text>
         </View>
-        
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedGender}
-            onValueChange={(itemValue) => setSelectedGender(itemValue)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Nam" value="Nam" />
-            <Picker.Item label="Nữ" value="Nữ" />
-            <Picker.Item label="Khác" value="Other" />
-          </Picker>
+        <View style={styles.inputContainer}>
+          <TextInput
+            value={editValue}
+            onChangeText={setEditValue}
+            style={styles.textArea}
+            multiline
+            numberOfLines={4}
+            placeholder="Nhập tiểu sử của bạn..."
+            autoFocus
+          />
         </View>
-        
         <View style={styles.buttonContainer}>
           <Pressable 
             style={[styles.button, styles.cancelButton]} 
@@ -74,7 +76,9 @@ const GenderSection = ({
           <Text style={styles.title}>{title}</Text>
         </View>
         <View style={styles.valueContainer}>
-          <Text style={styles.valueText}>{value}</Text>
+          <Text style={styles.valueText} numberOfLines={2}>
+            {value || 'Chưa có thông tin'}
+          </Text>
           <Feather name="chevron-down" size={20} color="#666" />
         </View>
       </View>
@@ -100,21 +104,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  pickerContainer: {
+  inputContainer: {
+    marginVertical: 8,
+  },
+  textArea: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 6,
-    marginVertical: 8,
+    padding: 12,
+    fontSize: 14,
     backgroundColor: '#fff',
-  },
-  picker: {
-    height: 50,
+    textAlignVertical: 'top',
+    minHeight: 100,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
-    marginTop: 8,
   },
   button: {
     flexDirection: 'row',
@@ -140,17 +146,20 @@ const styles = StyleSheet.create({
   rowContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   valueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    marginLeft: 8,
   },
   valueText: {
     fontSize: 14,
     color: '#666',
+    flex: 1,
   },
 });
 
-export default GenderSection;
+export default BioSection;

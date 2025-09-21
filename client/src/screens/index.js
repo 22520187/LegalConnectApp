@@ -4,6 +4,7 @@ import Profile from './User/Profile';
 import AskQuestion from './User/AskQuestion';
 import ChatBot from './User/ChatBot';
 import Message from './User/Message';
+import QuestionDetail from './User/QuestionDetail';
 const SCREENS = {
     LOGIN: 'Login',
     SIGNUP: 'Signup',
@@ -13,7 +14,8 @@ const SCREENS = {
     ASKQUESTION: 'AskQuestion',
     CHATBOT: 'ChatBot',
     MESSAGE: 'Message',
+    QUESTIONDETAIL: 'QuestionDetail',
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail };

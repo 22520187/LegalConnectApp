@@ -6,8 +6,8 @@ import { useNavigation } from '@react-navigation/native';
 import ProfileAvatar from './ProfileAvatar';
 import EditableSection from './EditableSection';
 import PasswordSection from './PasswordSection';
-import GenderSection from './GenderSection';
-import DateOfBirthSection from './DateOfBirthSection';
+import BioSection from './BioSection';
+import LegalExpertiseSection from './LegalExpertiseSection';
 import COLORS from '../../constant/colors';
 
 const ProfileSection = () => {
@@ -15,12 +15,11 @@ const ProfileSection = () => {
   // Mock user data for frontend-only version
   const [profile, setProfile] = useState({
     name: 'Nguyễn Văn An',
-    gender: 'Nam',
-    email: 'nguyenvanan@example.com',
+    bio: 'Luật sư có 5 năm kinh nghiệm trong lĩnh vực tư vấn pháp luật dân sự và hình sự. Tốt nghiệp Đại học Luật Hà Nội, từng làm việc tại nhiều văn phòng luật uy tín.',
+    legalExpertise: ['Luật Dân sự', 'Luật Hình sự', 'Luật Gia đình'],
     id: 1,
     first_name: 'Nguyễn Văn',
     last_name: 'An',
-    dateOfBirth: '1990-05-15',
     roles: ['User'],
   });
 
@@ -53,27 +52,27 @@ const ProfileSection = () => {
           type: 'success',
           text1: 'Cập nhật tên thành công'
         });
-      } else if (field === 'gender') {
+      } else if (field === 'bio') {
         // Update local state only (frontend-only)
         setProfile(prev => ({
           ...prev,
-          gender: value
+          bio: value
         }));
 
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật giới tính thành công'
+          text1: 'Cập nhật tiểu sử thành công'
         });
-      } else if (field === 'dateOfBirth') {
+      } else if (field === 'legalExpertise') {
         // Update local state only (frontend-only)
         setProfile(prev => ({
           ...prev,
-          dateOfBirth: value
+          legalExpertise: value
         }));
 
         Toast.show({
           type: 'success',
-          text1: 'Cập nhật ngày sinh thành công'
+          text1: 'Cập nhật chuyên môn pháp luật thành công'
         });
       } else {
         // For other fields, just update the state
@@ -169,8 +168,14 @@ const ProfileSection = () => {
             <ProfileAvatar name={profile.name} size="lg" />
             <View style={styles.textContainer}>
               <Text style={styles.nameText}>{profile.name}</Text>
-              <Text style={styles.infoText}>Giới tính: {profile.gender}</Text>
-              <Text style={styles.infoText}>Ngày sinh: {profile.dateOfBirth || 'Chưa có thông tin'}</Text>
+              <Text style={styles.infoText} numberOfLines={2}>
+                {profile.bio || 'Chưa có tiểu sử'}
+              </Text>
+              <Text style={styles.infoText}>
+                Chuyên môn: {profile.legalExpertise && profile.legalExpertise.length > 0 
+                  ? profile.legalExpertise.join(', ') 
+                  : 'Chưa chọn chuyên môn'}
+              </Text>
               <Text style={styles.infoText}>Role: {profile.roles && profile.roles.length > 0 ? profile.roles[0] : 'User'}</Text>
             </View>
           </View>
@@ -180,15 +185,6 @@ const ProfileSection = () => {
 
       {/* Editable Sections */}
       <View style={styles.sections}>
-        <View style={styles.viewOnlySection}>
-          <View style={styles.sectionHeader}>
-            <Feather name="mail" size={16} color="#666" />
-            <Text style={styles.sectionTitle}>E-mail</Text>
-            <Text style={styles.sectionValue}>{profile.email}</Text>
-          </View>
-
-        </View>
-
         <EditableSection
           title="Tên tài khoản"
           value={profile.name}
@@ -196,18 +192,18 @@ const ProfileSection = () => {
           icon={<Feather name="user" size={16} color="#666" />}
         />
 
-        <GenderSection
-          title="Giới tính"
-          value={profile.gender}
-          onSave={(value) => updateProfile('gender', value)}
-          icon={<Feather name="users" size={16} color="#666" />}
+        <BioSection
+          title="Tiểu sử"
+          value={profile.bio}
+          onSave={(value) => updateProfile('bio', value)}
+          icon={<Feather name="file-text" size={16} color="#666" />}
         />
 
-        <DateOfBirthSection
-          title="Ngày sinh"
-          value={profile.dateOfBirth}
-          onSave={(value) => updateProfile('dateOfBirth', value)}
-          icon={<Feather name="calendar" size={16} color="#666" />}
+        <LegalExpertiseSection
+          title="Chuyên môn"
+          value={profile.legalExpertise}
+          onSave={(value) => updateProfile('legalExpertise', value)}
+          icon={<Feather name="briefcase" size={16} color="#666" />}
         />
 
         <PasswordSection

@@ -12,8 +12,7 @@ export { default as PDFPicker } from './PDFPicker/PDFPicker';
 // Profile components
 export { default as ProfileSection } from './Account/ProfileSection';
 export { default as ProfileAvatar } from './Account/ProfileAvatar';
+export { default as LegalExpertiseSection } from './Account/LegalExpertiseSection';
 export { default as EditableSection } from './Account/EditableSection';
 export { default as EditableField } from './Account/EditableField';
-export { default as GenderSection } from './Account/GenderSection';
-export { default as DateOfBirthSection } from './Account/DateOfBirthSection';
 export { default as PasswordSection } from './Account/PasswordSection';

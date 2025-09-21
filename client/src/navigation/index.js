@@ -4,7 +4,7 @@ import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -24,6 +24,15 @@ function MyPostsStackNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MyPostsList" component={MyPosts} />
             <Stack.Screen name={SCREENS.ASKQUESTION} component={AskQuestion} />
+        </Stack.Navigator>
+    );
+}
+
+function HomeStackNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="HomeList" component={Home} />
+            <Stack.Screen name={SCREENS.QUESTIONDETAIL} component={QuestionDetail} />
         </Stack.Navigator>
     );
 }
@@ -64,7 +73,7 @@ const UserTabNavigator = () => {
         >
             <Tab.Screen
                 name={SCREENS.HOME}
-                component={Home}
+                component={HomeStackNavigator}
                 options={{
                     tabBarLabel: 'Diễn đàn',
                 }}
