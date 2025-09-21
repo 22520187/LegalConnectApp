@@ -4,7 +4,7 @@ import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -28,11 +28,23 @@ function MyPostsStackNavigator() {
     );
 }
 
+function MessageStackNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MessageList" component={Message} />
+            <Stack.Screen name={SCREENS.CHATSCREEN} component={ChatScreen} />
+            <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
+        </Stack.Navigator>
+    );
+}
+
 function HomeStackNavigator() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="HomeList" component={Home} />
             <Stack.Screen name={SCREENS.QUESTIONDETAIL} component={QuestionDetail} />
+            <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
+            <Stack.Screen name={SCREENS.CHATSCREEN} component={ChatScreen} />
         </Stack.Navigator>
     );
 }
@@ -53,7 +65,7 @@ const UserTabNavigator = () => {
                     } else if (route.name === SCREENS.PROFILE) {
                         iconName = focused ? 'person' : 'person-outline';
                     } else if (route.name === SCREENS.CHATBOT) {
-                        iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+                        iconName = focused ? 'logo-octocat' : 'logo-octocat';
                     } else if (route.name === SCREENS.MESSAGE) {
                         iconName = focused ? 'chatbox' : 'chatbox-outline';
                     } 
@@ -94,7 +106,7 @@ const UserTabNavigator = () => {
             />
             <Tab.Screen
                 name={SCREENS.MESSAGE}
-                component={Message}
+                component={MessageStackNavigator}
                 options={{
                     tabBarLabel: 'Tin nhắn',
                 }}

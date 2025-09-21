@@ -155,6 +155,14 @@ const QuestionDetail = ({ route, navigation }) => {
     );
   };
 
+  const handleUserPress = (userId, userName, userAvatar) => {
+    navigation.navigate('UserProfile', {
+      userId: userId,
+      userName: userName,
+      userAvatar: userAvatar,
+    });
+  };
+
   const handleShare = () => {
     Alert.alert('Chia sẻ', 'Chức năng chia sẻ đang được phát triển');
   };
@@ -237,7 +245,7 @@ const QuestionDetail = ({ route, navigation }) => {
         style={styles.actionButton}
         onPress={handleShare}
       >
-        <Ionicons name="share-outline" size={24} color={COLORS.GRAY} />
+        <Ionicons name="warning-outline" size={24} color={COLORS.RED} />
       </TouchableOpacity>
     </View>
   );
@@ -253,11 +261,14 @@ const QuestionDetail = ({ route, navigation }) => {
 
       <View style={styles.answerHeader}>
         <View style={styles.answerAuthor}>
-          <View style={styles.authorAvatar}>
+          <TouchableOpacity 
+            style={styles.authorAvatar}
+            onPress={() => handleUserPress(answer.author.id || Math.random(), answer.author.name, answer.author.avatar)}
+          >
             <Text style={styles.authorAvatarText}>
               {answer.author.name.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.authorInfo}>
             <Text style={styles.authorName}>{answer.author.name}</Text>
             <Text style={styles.authorTitle}>{answer.author.title}</Text>
@@ -362,11 +373,14 @@ const QuestionDetail = ({ route, navigation }) => {
           
           <View style={styles.questionMeta}>
             <View style={styles.questionAuthor}>
-              <View style={styles.questionAuthorAvatar}>
+              <TouchableOpacity 
+                style={styles.questionAuthorAvatar}
+                onPress={() => handleUserPress(question.author.id || Math.random(), question.author.name, question.author.avatar)}
+              >
                 <Text style={styles.questionAuthorAvatarText}>
                   {question.author.name.charAt(0).toUpperCase()}
                 </Text>
-              </View>
+              </TouchableOpacity>
               <View>
                 <Text style={styles.questionAuthorName}>{question.author.name}</Text>
                 <Text style={styles.questionTime}>{formatTimeAgo(question.createdAt)}</Text>
@@ -426,7 +440,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    // justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: COLORS.WHITE,
@@ -436,7 +450,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.BLACK,
+    color: COLORS.BLACK, 
+    marginLeft: 12,
   },
   content: {
     flex: 1,
@@ -528,6 +543,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: COLORS.GRAY_BG,
+    marginRight: 12,
+  },
+  reportButton: {
+    backgroundColor: COLORS.RED,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginRight: 12,
   },
   activeUpvote: {

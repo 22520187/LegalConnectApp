@@ -7,9 +7,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import COLORS from '../../constant/colors';
 
 const QuestionCard = ({ question, onPress }) => {
+  const navigation = useNavigation();
+  
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
     const questionTime = new Date(timestamp);
@@ -22,6 +25,15 @@ const QuestionCard = ({ question, onPress }) => {
     } else {
       return `${Math.floor(diffInMinutes / 1440)}d ago`;
     }
+  };
+
+  const handleAvatarPress = (e) => {
+    e.stopPropagation(); // Prevent triggering the card press
+    navigation.navigate('UserProfile', {
+      userId: question.author.id || Math.random(), // Fallback if no ID
+      userName: question.author.name,
+      userAvatar: question.author.avatar,
+    });
   };
 
   const renderTags = (tags) => {
@@ -100,11 +112,11 @@ const QuestionCard = ({ question, onPress }) => {
 
           {/* User Info */}
           <View style={styles.userInfo}>
-            <View style={styles.userAvatar}>
+            <TouchableOpacity style={styles.userAvatar} onPress={handleAvatarPress}>
               <Text style={styles.userAvatarText}>
                 {question.author.name.charAt(0).toUpperCase()}
               </Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{question.author.name}</Text>
               <Text style={styles.timeAgo}>{formatTimeAgo(question.createdAt)}</Text>
