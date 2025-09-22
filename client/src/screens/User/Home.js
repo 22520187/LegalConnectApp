@@ -134,7 +134,7 @@ const Home = ({ navigation }) => {
     };
 
     const handleSearch = () => {
-        Alert.alert('Search', 'Search functionality will be implemented here');
+        navigation.navigate('Search');
     };
 
     const handleNotification = () => {

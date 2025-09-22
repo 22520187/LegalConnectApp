@@ -8,6 +8,7 @@ import QuestionDetail from './User/QuestionDetail';
 import ChatScreen from './User/ChatScreen';
 import UserProfile from './User/UserProfile';
 import Notification from './User/Notification';
+import Search from './User/Search';
 
 const SCREENS = {
     LOGIN: 'Login',
@@ -22,7 +23,8 @@ const SCREENS = {
     CHATSCREEN: 'ChatScreen',
     USERPROFILE: 'UserProfile',
     NOTIFICATION: 'Notification',
+    SEARCH: 'Search',
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search };
