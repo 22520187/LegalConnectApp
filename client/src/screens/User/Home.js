@@ -138,7 +138,7 @@ const Home = ({ navigation }) => {
     };
 
     const handleNotification = () => {
-        Alert.alert('Notifications', 'You have 3 new notifications');
+        navigation.navigate('Notification');
     };
 
     const handleQuestionPress = (question) => {

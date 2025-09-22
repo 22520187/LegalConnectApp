@@ -7,6 +7,7 @@ import Message from './User/Message';
 import QuestionDetail from './User/QuestionDetail';
 import ChatScreen from './User/ChatScreen';
 import UserProfile from './User/UserProfile';
+import Notification from './User/Notification';
 
 const SCREENS = {
     LOGIN: 'Login',
@@ -20,7 +21,8 @@ const SCREENS = {
     QUESTIONDETAIL: 'QuestionDetail',
     CHATSCREEN: 'ChatScreen',
     USERPROFILE: 'UserProfile',
+    NOTIFICATION: 'Notification',
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification };

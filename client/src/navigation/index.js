@@ -4,7 +4,7 @@ import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -45,6 +45,7 @@ function HomeStackNavigator() {
             <Stack.Screen name={SCREENS.QUESTIONDETAIL} component={QuestionDetail} />
             <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
             <Stack.Screen name={SCREENS.CHATSCREEN} component={ChatScreen} />
+            <Stack.Screen name={SCREENS.NOTIFICATION} component={Notification} />
         </Stack.Navigator>
     );
 }
