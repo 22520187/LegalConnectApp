@@ -489,12 +489,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.GRAY_BG,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.BLACK,
-    marginBottom: 12,
-  },
+   sectionTitle: {
+     fontSize: 16,
+     fontWeight: 'bold',
+     color: COLORS.BLACK,
+     marginBottom: 12,
+   },
   recentSearchItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -559,13 +559,13 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
     paddingHorizontal: 32,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.BLACK,
-    marginTop: 16,
-    marginBottom: 8,
-  },
+   emptyTitle: {
+     fontSize: 18,
+     fontWeight: 'bold',
+     color: COLORS.BLACK,
+     marginTop: 16,
+     marginBottom: 8,
+   },
   emptyText: {
     fontSize: 14,
     color: COLORS.GRAY,

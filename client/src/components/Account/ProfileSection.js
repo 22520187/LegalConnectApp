@@ -173,12 +173,22 @@ const ProfileSection = () => {
                 {profile.bio || 'Chưa có tiểu sử'}
               </Text>
               <Text style={styles.infoText}>
-                Chuyên môn: {profile.legalExpertise && profile.legalExpertise.length > 0 
-                  ? profile.legalExpertise.join(', ') 
-                  : 'Chưa chọn chuyên môn'}
+                <Text style={styles.labelText}>Chuyên môn: </Text>
+                <Text style={styles.valueText}>
+                  {profile.legalExpertise && profile.legalExpertise.length > 0 
+                    ? profile.legalExpertise.join(', ') 
+                    : 'Chưa chọn chuyên môn'}
+                </Text>
               </Text>
-              <Text style={styles.infoText}>Followers: {profile.followers}</Text>
-              <Text style={styles.infoText}>Uy tín: {profile.reputation} <Ionicons name="star-outline" size={16} color={COLORS.GREEN} /></Text>
+              <Text style={styles.infoText}>
+                <Text style={styles.labelText}>Lượt theo dõi: </Text>
+                <Text style={styles.valueText}>{profile.followers}</Text>
+              </Text>
+              <Text style={styles.infoText}>
+                <Text style={styles.labelText}>Uy tín: </Text>
+                <Text style={styles.valueText}>{profile.reputation} </Text>
+                <Ionicons name="star-outline" size={16} color={COLORS.GREEN} />
+              </Text>
             </View>
           </View>
         </View>
@@ -270,6 +280,12 @@ const styles = StyleSheet.create({
       fontSize: 14,
       color: '#666',
       marginBottom: 4,
+    },
+    labelText: {
+      fontWeight: 'bold',
+    },
+    valueText: {
+      fontWeight: 'normal',
     },
     editButton: {
       flexDirection: 'row',
