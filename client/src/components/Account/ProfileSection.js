@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useNavigation } from '@react-navigation/native';
 import ProfileAvatar from './ProfileAvatar';
@@ -20,7 +20,8 @@ const ProfileSection = () => {
     id: 1,
     first_name: 'Nguyễn Văn',
     last_name: 'An',
-    roles: ['User'],
+    followers: 100,
+    reputation: 100,
   });
 
   const updateProfile = (field, value) => {
@@ -176,7 +177,8 @@ const ProfileSection = () => {
                   ? profile.legalExpertise.join(', ') 
                   : 'Chưa chọn chuyên môn'}
               </Text>
-              <Text style={styles.infoText}>Role: {profile.roles && profile.roles.length > 0 ? profile.roles[0] : 'User'}</Text>
+              <Text style={styles.infoText}>Followers: {profile.followers}</Text>
+              <Text style={styles.infoText}>Uy tín: {profile.reputation} <Ionicons name="star-outline" size={16} color={COLORS.GREEN} /></Text>
             </View>
           </View>
         </View>
