@@ -8,6 +8,8 @@ export { default as FloatingActionButton } from './FloatingActionButton/Floating
 export { default as ChatMessage } from './ChatMessage/ChatMessage';
 export { default as ChatInput } from './ChatInput/ChatInput';
 export { default as PDFPicker } from './PDFPicker/PDFPicker';
+export { default as CommentInput } from './CommentInput/CommentInput';
+export { default as CommentItem } from './CommentItem/CommentItem';
 
 // Profile components
 export { default as ProfileSection } from './Account/ProfileSection';

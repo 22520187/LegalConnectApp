@@ -24,6 +24,8 @@ function MyPostsStackNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MyPostsList" component={MyPosts} />
             <Stack.Screen name={SCREENS.ASKQUESTION} component={AskQuestion} />
+            <Stack.Screen name={SCREENS.QUESTIONDETAIL} component={QuestionDetail} />
+            <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
         </Stack.Navigator>
     );
 }
@@ -33,6 +35,15 @@ function MessageStackNavigator() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MessageList" component={Message} />
             <Stack.Screen name={SCREENS.CHATSCREEN} component={ChatScreen} />
+            <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
+        </Stack.Navigator>
+    );
+}
+
+function ProfileStackNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="ProfileMain" component={Profile} />
             <Stack.Screen name={SCREENS.USERPROFILE} component={UserProfile} />
         </Stack.Navigator>
     );
@@ -115,7 +126,7 @@ const UserTabNavigator = () => {
             />
             <Tab.Screen
                 name={SCREENS.PROFILE}
-                component={Profile}
+                component={ProfileStackNavigator}
                 options={{
                     tabBarLabel: 'Hồ sơ',
                 }}
