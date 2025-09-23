@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import CommentInput from '../../components/CommentInput/CommentInput';
+import CommentItem from '../../components/CommentItem/CommentItem';
 
 const { width } = Dimensions.get('window');
 
@@ -20,9 +22,16 @@ const QuestionDetail = ({ route, navigation }) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [voteCount, setVoteCount] = useState(question.voteCount);
   const [expandedComments, setExpandedComments] = useState({});
+  const [showCommentInput, setShowCommentInput] = useState({});
+  const [replyTo, setReplyTo] = useState(null);
+  const [answersData, setAnswersData] = useState([]);
+  const [editingComment, setEditingComment] = useState(null);
+  const [showAddAnswer, setShowAddAnswer] = useState(false);
+  const currentUserId = 'current_user_id'; // In real app, get from auth context
 
-  // Mock answers data
-  const [answers] = useState([
+  // Initialize answers data
+  useEffect(() => {
+    setAnswersData([
     {
       id: 1,
       content: 'Để khởi nghiệp tại Việt Nam, bạn cần thực hiện các bước sau:\n\n1. **Đăng ký kinh doanh**: Nộp hồ sơ tại Sở Kế hoạch và Đầu tư hoặc trực tuyến qua cổng dịch vụ công quốc gia.\n\n2. **Giấy tờ cần thiết**:\n   - Giấy chứng minh nhân dân/Căn cước công dân\n   - Tờ khai đăng ký doanh nghiệp\n   - Bản sao công chứng hợp đồng thuê văn phòng\n\n3. **Vốn pháp định**: Tối thiểu 15 tỷ đồng cho công ty cổ phần, không quy định tối thiểu cho công ty TNHH.\n\n4. **Thủ tục thuế**: Đăng ký mã số thuế, khai báo thuế hàng tháng/quý.\n\nThời gian xử lý thường là 15-20 ngày làm việc.',
@@ -41,14 +50,24 @@ const QuestionDetail = ({ route, navigation }) => {
         {
           id: 1,
           author: 'Mai Thu',
-          content: 'Cảm ơn bạn, thông tin rất hữu ích!',
+          authorId: 'user_1',
+          content: 'Cảm ơn bạn, thông tin rất hữu ích! Tôi đang cần thông tin này để chuẩn bị cho việc khởi nghiệp.',
           createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
         },
         {
           id: 2,
           author: 'Phạm Minh',
-          content: 'Có cần giấy phép kinh doanh riêng không?',
+          authorId: 'user_2',
+          content: 'Có cần giấy phép kinh doanh riêng không? Và thời gian xử lý thủ tục thường là bao lâu?',
           createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        },
+        {
+          id: 3,
+          author: 'Bạn',
+          authorId: 'current_user_id',
+          content: 'Trả lời @Phạm Minh: Thời gian thường là 15-20 ngày làm việc như luật sư đã nói.',
+          createdAt: new Date(Date.now() - 30 * 60 * 1000),
+          replyTo: 'Phạm Minh'
         }
       ]
     },
@@ -68,9 +87,10 @@ const QuestionDetail = ({ route, navigation }) => {
       isAccepted: false,
       comments: [
         {
-          id: 3,
+          id: 4,
           author: 'Hoàng Nam',
-          content: 'Tôi đã làm theo hướng dẫn này và rất thành công.',
+          authorId: 'user_3',
+          content: 'Tôi đã làm theo hướng dẫn này và rất thành công. Nhớ chuẩn bị đầy đủ giấy tờ trước khi nộp hồ sơ.',
           createdAt: new Date(Date.now() - 30 * 60 * 1000),
         }
       ]
@@ -91,7 +111,8 @@ const QuestionDetail = ({ route, navigation }) => {
       isAccepted: false,
       comments: []
     }
-  ]);
+    ]);
+  }, []);
 
   // Mock related questions
   const relatedQuestions = [
@@ -180,6 +201,147 @@ const QuestionDetail = ({ route, navigation }) => {
       ...prev,
       [answerId]: !prev[answerId]
     }));
+  };
+
+  const handleAddComment = (answerId) => {
+    setShowCommentInput(prev => ({
+      ...prev,
+      [answerId]: !prev[answerId]
+    }));
+    setReplyTo(null);
+  };
+
+  const handleReplyToComment = (answerId, commentAuthor) => {
+    setShowCommentInput(prev => ({
+      ...prev,
+      [answerId]: true
+    }));
+    setReplyTo(commentAuthor);
+  };
+
+  const handleSubmitComment = async (answerId, commentText) => {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    if (editingComment) {
+      // Edit existing comment
+      setAnswersData(prev => 
+        prev.map(answer => 
+          answer.id === answerId
+            ? {
+                ...answer,
+                comments: answer.comments.map(comment => 
+                  comment.id === editingComment.id
+                    ? { ...comment, content: commentText, isEdited: true }
+                    : comment
+                )
+              }
+            : answer
+        )
+      );
+      setEditingComment(null);
+      Alert.alert('Thành công', 'Đã cập nhật bình luận!');
+    } else {
+      // Add new comment
+      const newComment = {
+        id: Date.now(),
+        author: 'Bạn', // Current user name
+        authorId: currentUserId,
+        content: commentText,
+        createdAt: new Date(),
+        replyTo: replyTo
+      };
+
+      setAnswersData(prev => 
+        prev.map(answer => 
+          answer.id === answerId
+            ? {
+                ...answer,
+                comments: [...answer.comments, newComment]
+              }
+            : answer
+        )
+      );
+      Alert.alert('Thành công', 'Đã thêm bình luận của bạn!');
+    }
+
+    // Close comment input
+    setShowCommentInput(prev => ({
+      ...prev,
+      [answerId]: false
+    }));
+    setReplyTo(null);
+
+    // Expand comments to show the new one
+    setExpandedComments(prev => ({
+      ...prev,
+      [answerId]: true
+    }));
+  };
+
+  const handleCancelComment = (answerId) => {
+    setShowCommentInput(prev => ({
+      ...prev,
+      [answerId]: false
+    }));
+    setReplyTo(null);
+    setEditingComment(null);
+  };
+
+  const handleDeleteComment = (answerId, commentId) => {
+    setAnswersData(prev => 
+      prev.map(answer => 
+        answer.id === answerId
+          ? {
+              ...answer,
+              comments: answer.comments.filter(comment => comment.id !== commentId)
+            }
+          : answer
+      )
+    );
+  };
+
+  const handleEditComment = (answerId, comment) => {
+    setEditingComment(comment);
+    setShowCommentInput(prev => ({
+      ...prev,
+      [answerId]: true
+    }));
+    setReplyTo(null);
+  };
+
+  const handleAddAnswer = () => {
+    setShowAddAnswer(!showAddAnswer);
+  };
+
+  const handleSubmitAnswer = async (answerText) => {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const newAnswer = {
+      id: Date.now(),
+      content: answerText,
+      author: {
+        id: currentUserId,
+        name: 'Bạn',
+        avatar: null,
+        title: 'Thành viên',
+        reputation: 0,
+      },
+      voteCount: 0,
+      userVote: null,
+      createdAt: new Date(),
+      isAccepted: false,
+      comments: []
+    };
+
+    setAnswersData(prev => [...prev, newAnswer]);
+    setShowAddAnswer(false);
+    Alert.alert('Thành công', 'Đã thêm câu trả lời của bạn!');
+  };
+
+  const handleCancelAnswer = () => {
+    setShowAddAnswer(false);
   };
 
   const renderTags = (tags) => {
@@ -308,33 +470,61 @@ const QuestionDetail = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
 
-        {answer.comments.length > 0 && (
+        <View style={styles.commentActionsContainer}>
+          {answer.comments.length > 0 && (
+            <TouchableOpacity 
+              style={styles.commentsToggle}
+              onPress={() => toggleComments(answer.id)}
+            >
+              <Ionicons 
+                name={expandedComments[answer.id] ? "chevron-up" : "chevron-down"} 
+                size={16} 
+                color={COLORS.BLUE} 
+              />
+              <Text style={styles.commentsToggleText}>
+                {answer.comments.length} bình luận
+              </Text>
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity 
-            style={styles.commentsToggle}
-            onPress={() => toggleComments(answer.id)}
+            style={styles.addCommentButton}
+            onPress={() => handleAddComment(answer.id)}
           >
-            <Ionicons 
-              name={expandedComments[answer.id] ? "chevron-up" : "chevron-down"} 
-              size={16} 
-              color={COLORS.BLUE} 
-            />
-            <Text style={styles.commentsToggleText}>
-              {answer.comments.length} bình luận
+            <Ionicons name="chatbubble-outline" size={16} color={COLORS.BLUE} />
+            <Text style={styles.addCommentText}>
+              {showCommentInput[answer.id] ? 'Hủy' : 'Bình luận'}
             </Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       {expandedComments[answer.id] && answer.comments.length > 0 && (
         <View style={styles.commentsContainer}>
           {answer.comments.map((comment) => (
-            <View key={comment.id} style={styles.comment}>
-              <Text style={styles.commentAuthor}>{comment.author}</Text>
-              <Text style={styles.commentContent}>{comment.content}</Text>
-              <Text style={styles.commentTime}>{formatTimeAgo(comment.createdAt)}</Text>
-            </View>
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              currentUserId={currentUserId}
+              formatTimeAgo={formatTimeAgo}
+              onReply={(author) => handleReplyToComment(answer.id, author)}
+              onDelete={(commentId) => handleDeleteComment(answer.id, commentId)}
+              onEdit={(comment) => handleEditComment(answer.id, comment)}
+            />
           ))}
         </View>
+      )}
+      
+      {showCommentInput[answer.id] && (
+        <CommentInput
+          visible={showCommentInput[answer.id]}
+          onSubmit={(text) => handleSubmitComment(answer.id, text)}
+          onCancel={() => handleCancelComment(answer.id)}
+          replyTo={replyTo}
+          autoFocus={true}
+          initialText={editingComment ? editingComment.content : ''}
+          placeholder={editingComment ? 'Chỉnh sửa bình luận...' : 'Viết bình luận của bạn...'}
+        />
       )}
     </View>
   );
@@ -399,10 +589,38 @@ const QuestionDetail = ({ route, navigation }) => {
 
         {/* Answers Section */}
         <View style={styles.answersSection}>
-          <Text style={styles.answersTitle}>
-            {answers.length} Câu trả lời
-          </Text>
-          {answers.map(renderAnswer)}
+          <View style={styles.answersSectionHeader}>
+            <Text style={styles.answersTitle}>
+              {answersData.length} Câu trả lời
+            </Text>
+            <TouchableOpacity 
+              style={styles.addAnswerButton}
+              onPress={handleAddAnswer}
+            >
+              <Ionicons 
+                name={showAddAnswer ? "close" : "add"} 
+                size={20} 
+                color={COLORS.WHITE} 
+              />
+              <Text style={styles.addAnswerButtonText}>
+                {showAddAnswer ? 'Hủy' : 'Trả lời'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          {showAddAnswer && (
+            <View style={styles.addAnswerContainer}>
+              <CommentInput
+                visible={showAddAnswer}
+                onSubmit={handleSubmitAnswer}
+                onCancel={handleCancelAnswer}
+                placeholder="Viết câu trả lời của bạn..."
+                autoFocus={true}
+              />
+            </View>
+          )}
+          
+          {answersData.map(renderAnswer)}
         </View>
 
         {/* Related Questions */}
@@ -577,11 +795,33 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
+  answersSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   answersTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.BLACK,
-    marginBottom: 16,
+  },
+  addAnswerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.BLUE,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  addAnswerButtonText: {
+    fontSize: 14,
+    color: COLORS.WHITE,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  addAnswerContainer: {
+    marginBottom: 20,
   },
   answerContainer: {
     borderBottomWidth: 1,
@@ -694,6 +934,12 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontWeight: '600',
   },
+  commentActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginLeft: 'auto',
+  },
   commentsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -705,6 +951,19 @@ const styles = StyleSheet.create({
     color: COLORS.BLUE,
     marginLeft: 4,
   },
+  addCommentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 12,
+  },
+  addCommentText: {
+    fontSize: 12,
+    color: COLORS.BLUE,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
   commentsContainer: {
     marginTop: 12,
     backgroundColor: COLORS.GRAY_BG,
@@ -712,12 +971,38 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   comment: {
-    marginBottom: 8,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.GRAY_LIGHT,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   commentAuthor: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.BLACK,
+  },
+  replyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  replyButtonText: {
+    fontSize: 11,
+    color: COLORS.BLUE,
+    marginLeft: 3,
+  },
+  commentReplyTo: {
+    fontSize: 11,
+    color: COLORS.GRAY,
+    fontStyle: 'italic',
+    marginBottom: 4,
   },
   commentContent: {
     fontSize: 13,

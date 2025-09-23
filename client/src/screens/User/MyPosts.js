@@ -70,8 +70,8 @@ const MyPosts = ({ navigation }) => {
     };
 
     const handleQuestionPress = (question) => {
-        // Navigate to question detail - implement this when you have the detail screen
-        console.log('Question pressed:', question.title);
+        // Navigate to question detail
+        navigation.navigate(SCREENS.QUESTIONDETAIL, { question });
     };
 
     const handleRefresh = () => {
