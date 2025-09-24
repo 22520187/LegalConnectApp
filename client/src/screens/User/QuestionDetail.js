@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
 import CommentInput from '../../components/CommentInput/CommentInput';
 import CommentItem from '../../components/CommentItem/CommentItem';
+import ReportModal from '../../components/ReportModal/ReportModal';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,8 @@ const QuestionDetail = ({ route, navigation }) => {
   const [answersData, setAnswersData] = useState([]);
   const [editingComment, setEditingComment] = useState(null);
   const [showAddAnswer, setShowAddAnswer] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
   const currentUserId = 'current_user_id'; // In real app, get from auth context
 
   // Initialize answers data
@@ -184,8 +187,34 @@ const QuestionDetail = ({ route, navigation }) => {
     });
   };
 
-  const handleShare = () => {
-    Alert.alert('Chia sẻ', 'Chức năng chia sẻ đang được phát triển');
+  const handleReport = () => {
+    setReportTarget({
+      type: 'post',
+      id: question.id,
+      title: question.title
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportUser = (userId, userName) => {
+    setReportTarget({
+      type: 'user',
+      id: userId,
+      title: userName
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportSubmit = (reportData) => {
+    console.log('Report submitted:', reportData);
+    // Here you would typically send the report to your backend
+    setShowReportModal(false);
+    setReportTarget(null);
+  };
+
+  const handleCloseReportModal = () => {
+    setShowReportModal(false);
+    setReportTarget(null);
   };
 
   const handleAnswerVote = (answerId, type) => {
@@ -405,9 +434,10 @@ const QuestionDetail = ({ route, navigation }) => {
 
       <TouchableOpacity 
         style={styles.actionButton}
-        onPress={handleShare}
+        onPress={handleReport}
       >
-        <Ionicons name="warning-outline" size={24} color={COLORS.RED} />
+        <Ionicons name="flag-outline" size={24} color={COLORS.RED} />
+        <Text style={styles.reportButtonText}>Báo cáo</Text>
       </TouchableOpacity>
     </View>
   );
@@ -436,6 +466,14 @@ const QuestionDetail = ({ route, navigation }) => {
             <Text style={styles.authorTitle}>{answer.author.title}</Text>
             <Text style={styles.authorReputation}>{answer.author.reputation} điểm uy tín</Text>
           </View>
+          {answer.author.id !== currentUserId && (
+            <TouchableOpacity 
+              style={styles.reportUserButton}
+              onPress={() => handleReportUser(answer.author.id, answer.author.name)}
+            >
+              <Ionicons name="flag-outline" size={16} color={COLORS.RED} />
+            </TouchableOpacity>
+          )}
         </View>
         <Text style={styles.answerTime}>{formatTimeAgo(answer.createdAt)}</Text>
       </View>
@@ -646,6 +684,15 @@ const QuestionDetail = ({ route, navigation }) => {
           </ScrollView>
         </View>
       </ScrollView>
+
+      <ReportModal
+        visible={showReportModal}
+        onClose={handleCloseReportModal}
+        reportType={reportTarget?.type}
+        targetId={reportTarget?.id}
+        targetTitle={reportTarget?.title}
+        onSubmit={handleReportSubmit}
+      />
     </SafeAreaView>
   );
 };
@@ -790,6 +837,12 @@ const styles = StyleSheet.create({
   activeUpvoteText: {
     color: COLORS.WHITE,
   },
+  reportButtonText: {
+    fontSize: 12,
+    color: COLORS.RED,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
   answersSection: {
     backgroundColor: COLORS.WHITE,
     padding: 16,
@@ -887,6 +940,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.GRAY,
     marginTop: 1,
+  },
+  reportUserButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   answerTime: {
     fontSize: 12,

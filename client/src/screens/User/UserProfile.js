@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import COLORS from '../../constant/colors';
+import ReportModal from '../../components/ReportModal/ReportModal';
 
 const UserProfile = () => {
   const navigation = useNavigation();
@@ -20,6 +21,7 @@ const UserProfile = () => {
   const { userId, userName, userAvatar } = route.params;
   
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Mock user profile data
   const [userProfile] = useState({
@@ -109,14 +111,17 @@ const UserProfile = () => {
   };
 
   const handleReport = () => {
-    Alert.alert(
-      'Báo cáo người dùng',
-      'Bạn có chắc chắn muốn báo cáo người dùng này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Báo cáo', style: 'destructive' },
-      ]
-    );
+    setShowReportModal(true);
+  };
+
+  const handleReportSubmit = (reportData) => {
+    console.log('User report submitted:', reportData);
+    // Here you would typically send the report to your backend
+    setShowReportModal(false);
+  };
+
+  const handleCloseReportModal = () => {
+    setShowReportModal(false);
   };
 
   const renderStatItem = (label, value, icon) => (
@@ -280,6 +285,15 @@ const UserProfile = () => {
           {recentActivities.map(renderActivityItem)}
         </View>
       </ScrollView>
+
+      <ReportModal
+        visible={showReportModal}
+        onClose={handleCloseReportModal}
+        reportType="user"
+        targetId={userProfile.id}
+        targetTitle={userProfile.name}
+        onSubmit={handleReportSubmit}
+      />
     </SafeAreaView>
   );
 };
