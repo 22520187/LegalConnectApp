@@ -9,9 +9,12 @@ import PasswordSection from './PasswordSection';
 import BioSection from './BioSection';
 import LegalExpertiseSection from './LegalExpertiseSection';
 import COLORS from '../../constant/colors';
+import SCREENS from '../../screens';
+import { useAuth } from '../../context/AuthContext';
 
 const ProfileSection = () => {
   const navigation = useNavigation();
+  const { logout } = useAuth();
   // Mock user data for frontend-only version
   const [profile, setProfile] = useState({
     name: 'Nguyễn Văn An',
@@ -140,18 +143,12 @@ const ProfileSection = () => {
           text: 'Đăng xuất',
           onPress: () => {
             try {
-              // Frontend-only logout - just show success message
+              logout();
               Toast.show({
                 type: 'success',
                 text1: 'Đăng xuất thành công',
                 text2: 'Hẹn gặp lại bạn!'
               });
-
-              // In a real app, you would navigate to login screen
-              // navigation.reset({
-              //   index: 0,
-              //   routes: [{ name: 'Login' }],
-              // });
             } catch (error) {
               Alert.alert('Lỗi', 'Không thể đăng xuất. Vui lòng thử lại.');
             }
