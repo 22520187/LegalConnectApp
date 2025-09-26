@@ -1,10 +1,9 @@
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer, useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, AdminDashboard, UserManagement, PostManagement } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -139,17 +138,19 @@ const AdminTabNavigator = () => {
     const {isKeyboardVisible} = useIsKeyboardVisible();
     return (
         <Tab.Navigator
-            initialRouteName={SCREENS.ADMIN_DASHBOARD}
+            initialRouteName={SCREENS.POST_MANAGEMENT}
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName;
                     
-                    if (route.name === SCREENS.ADMIN_DASHBOARD) {
-                        iconName = focused ? 'grid' : 'grid-outline';
+                    if (route.name === SCREENS.POST_MANAGEMENT) {
+                        iconName = focused ? 'document-text' : 'document-text-outline';
                     } else if (route.name === SCREENS.USER_MANAGEMENT) {
                         iconName = focused ? 'people' : 'people-outline';
-                    } else if (route.name === SCREENS.POST_MANAGEMENT) {
-                        iconName = focused ? 'document-text' : 'document-text-outline';
+                    }else if (route.name === SCREENS.ADMIN_ACCOUNT) {
+                        iconName = focused ? 'person' : 'person-outline';
+                    } else if (route.name === SCREENS.LAWYER_MANAGEMENT) {
+                        iconName = focused ? 'briefcase' : 'briefcase-outline';
                     }
                     
                     return <Ionicons name={iconName} size={size} color={color} />;
@@ -166,10 +167,10 @@ const AdminTabNavigator = () => {
             })}
         >
             <Tab.Screen
-                name={SCREENS.ADMIN_DASHBOARD}
-                component={AdminDashboard}
+                name={SCREENS.POST_MANAGEMENT}
+                component={PostManagement}
                 options={{
-                    tabBarLabel: 'Dashboard',
+                    tabBarLabel: 'Bài viết',
                 }}
             />
             <Tab.Screen
@@ -180,10 +181,17 @@ const AdminTabNavigator = () => {
                 }}
             />
             <Tab.Screen
-                name={SCREENS.POST_MANAGEMENT}
-                component={PostManagement}
+                name={SCREENS.LAWYER_MANAGEMENT}
+                component={LawyerManagement}
                 options={{
-                    tabBarLabel: 'Bài viết',
+                    tabBarLabel: 'Luật sư',
+                }}
+            />
+            <Tab.Screen
+                name={SCREENS.ADMIN_ACCOUNT}
+                component={AdminAccount}
+                options={{
+                    tabBarLabel: 'Tài khoản',
                 }}
             />
         </Tab.Navigator>

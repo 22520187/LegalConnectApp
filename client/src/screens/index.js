@@ -9,7 +9,8 @@ import ChatScreen from './User/ChatScreen';
 import UserProfile from './User/UserProfile';
 import Notification from './User/Notification';
 import Search from './User/Search';
-import AdminDashboard from './Admin/AdminDashboard';
+import LawyerManagement from './Admin/LawyerManagement';
+import AdminAccount from './Admin/AdminAccount';
 import UserManagement from './Admin/UserManagement';
 import PostManagement from './Admin/PostManagement';
 
@@ -27,10 +28,11 @@ const SCREENS = {
     USERPROFILE: 'UserProfile',
     NOTIFICATION: 'Notification',
     SEARCH: 'Search',
-    ADMIN_DASHBOARD: 'AdminDashboard',
     USER_MANAGEMENT: 'UserManagement',
     POST_MANAGEMENT: 'PostManagement',
+    LAWYER_MANAGEMENT: 'LawyerManagement',
+    ADMIN_ACCOUNT: 'AdminAccount',
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, AdminDashboard, UserManagement, PostManagement };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount };
