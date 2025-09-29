@@ -8,6 +8,7 @@ import EditableSection from './EditableSection';
 import PasswordSection from './PasswordSection';
 import BioSection from './BioSection';
 import LegalExpertiseSection from './LegalExpertiseSection';
+import LawyerRequestModal from '../LawyerRequestModal/LawyerRequestModal';
 import COLORS from '../../constant/colors';
 import SCREENS from '../../screens';
 import { useAuth } from '../../context/AuthContext';
@@ -25,7 +26,10 @@ const ProfileSection = () => {
     last_name: 'An',
     followers: 100,
     reputation: 100,
+    lawyerRequestStatus: null, // null, 'pending', 'approved', 'rejected'
   });
+
+  const [showLawyerRequestModal, setShowLawyerRequestModal] = useState(false);
 
   const updateProfile = (field, value) => {
     try {
@@ -158,6 +162,75 @@ const ProfileSection = () => {
     );
   };
 
+  const handleLawyerRequest = (requestData) => {
+    // Update profile with pending status
+    setProfile(prev => ({
+      ...prev,
+      lawyerRequestStatus: 'pending'
+    }));
+
+    Toast.show({
+      type: 'success',
+      text1: 'Gửi yêu cầu thành công',
+      text2: 'Yêu cầu của bạn đang được xét duyệt'
+    });
+  };
+
+  const renderLawyerRequestStatus = () => {
+    if (profile.lawyerRequestStatus === 'pending') {
+      return (
+        <View style={styles.statusSection}>
+          <View style={styles.statusHeader}>
+            <Ionicons name="time-outline" size={20} color={COLORS.ORANGE} />
+            <Text style={styles.statusTitle}>Trạng thái yêu cầu luật sư</Text>
+          </View>
+          <Text style={[styles.statusText, { color: COLORS.ORANGE }]}>
+            Đang chờ xử lý
+          </Text>
+          <Text style={styles.statusDescription}>
+            Yêu cầu của bạn đang được admin xem xét. Chúng tôi sẽ thông báo kết quả sớm nhất.
+          </Text>
+        </View>
+      );
+    }
+    
+    if (profile.lawyerRequestStatus === 'approved') {
+      return (
+        <View style={styles.statusSection}>
+          <View style={styles.statusHeader}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.GREEN} />
+            <Text style={styles.statusTitle}>Trạng thái yêu cầu luật sư</Text>
+          </View>
+          <Text style={[styles.statusText, { color: COLORS.GREEN }]}>
+            Đã được phê duyệt
+          </Text>
+          <Text style={styles.statusDescription}>
+            Chúc mừng! Bạn đã trở thành luật sư được xác nhận.
+          </Text>
+        </View>
+      );
+    }
+    
+    if (profile.lawyerRequestStatus === 'rejected') {
+      return (
+        <View style={styles.statusSection}>
+          <View style={styles.statusHeader}>
+            <Ionicons name="close-circle" size={20} color={COLORS.RED} />
+            <Text style={styles.statusTitle}>Trạng thái yêu cầu luật sư</Text>
+          </View>
+          <Text style={[styles.statusText, { color: COLORS.RED }]}>
+            Bị từ chối
+          </Text>
+          <Text style={styles.statusDescription}>
+            Yêu cầu của bạn không được chấp nhận. Vui lòng kiểm tra lại thông tin và gửi lại.
+          </Text>
+        </View>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.card}>
@@ -222,13 +295,31 @@ const ProfileSection = () => {
         />
       </View>
 
+      {/* Lawyer Request Status */}
+      {renderLawyerRequestStatus()}
 
-
+      {/* Lawyer Request Button */}
+      {!profile.lawyerRequestStatus && (
+        <Pressable 
+          style={styles.lawyerRequestButton} 
+          onPress={() => setShowLawyerRequestModal(true)}
+        >
+          <Ionicons name="briefcase-outline" size={20} color={COLORS.WHITE} />
+          <Text style={styles.lawyerRequestText}>Yêu cầu trở thành luật sư</Text>
+        </Pressable>
+      )}
 
       {/* Logout Button */}
       <Pressable style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Đăng xuất</Text>
       </Pressable>
+
+      {/* Lawyer Request Modal */}
+      <LawyerRequestModal
+        visible={showLawyerRequestModal}
+        onClose={() => setShowLawyerRequestModal(false)}
+        onSubmit={handleLawyerRequest}
+      />
 
     </ScrollView>
   );
@@ -406,6 +497,52 @@ const styles = StyleSheet.create({
     },
     activeNavLabel: {
       fontWeight: '500',
+    },
+    statusSection: {
+      backgroundColor: '#f8f9fa',
+      padding: 16,
+      marginHorizontal: 16,
+      marginTop: 16,
+      borderRadius: 8,
+      borderLeftWidth: 4,
+      borderLeftColor: COLORS.ORANGE,
+    },
+    statusHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    statusTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+      color: COLORS.BLACK,
+    },
+    statusText: {
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 4,
+    },
+    statusDescription: {
+      fontSize: 12,
+      color: COLORS.GRAY,
+      lineHeight: 16,
+    },
+    lawyerRequestButton: {
+      backgroundColor: COLORS.GREEN,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      borderRadius: 8,
+      marginHorizontal: 16,
+      marginTop: 16,
+    },
+    lawyerRequestText: {
+      color: COLORS.WHITE,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
     },
   });
 
