@@ -192,7 +192,7 @@ const Home = ({ navigation }) => {
                     />
                 </View>
                 
-                <FloatingActionButton onPress={handleAddQuestion} />
+                {/* <FloatingActionButton onPress={handleAddQuestion} /> */}
             </SafeAreaView>
         </View>
     );
