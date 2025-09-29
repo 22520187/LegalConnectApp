@@ -3,11 +3,22 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+function LandingStackNavigator() {
+    return (
+        <Stack.Navigator initialRouteName={SCREENS.LEGAL_DOCUMENTS} screenOptions={{ headerShown: false }}>
+            <Stack.Screen name={SCREENS.LEGAL_DOCUMENTS} component={LegalDocuments} />
+            <Stack.Screen name={SCREENS.LEGAL_DOCUMENT_DETAIL} component={LegalDocumentDetail} />
+            <Stack.Screen name={SCREENS.LOGIN} component={Login} />
+            <Stack.Screen name={SCREENS.SIGNUP} component={SignUp} />
+        </Stack.Navigator>
+    );
+}
 
 function AuthStackNavigator() {
     return (
@@ -198,4 +209,4 @@ const AdminTabNavigator = () => {
     )
 }
 
-export { AuthStackNavigator, UserTabNavigator, AdminTabNavigator };
+export { LandingStackNavigator, AuthStackNavigator, UserTabNavigator, AdminTabNavigator };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { AuthStackNavigator, UserTabNavigator, AdminTabNavigator } from './src/navigation';
+import { LandingStackNavigator, AuthStackNavigator, UserTabNavigator, AdminTabNavigator } from './src/navigation';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import COLORS from './src/constant/colors';
@@ -13,7 +13,7 @@ const AppNavigator = () => {
 
   const getNavigator = () => {
     if (!isAuthenticated) {
-      return <AuthStackNavigator />;
+      return <LandingStackNavigator />;
     }
     
     // Kiểm tra role của user để điều hướng
@@ -32,9 +32,8 @@ const AppNavigator = () => {
 };
 
 export default function App() {
-  // Giả sử user đã đăng nhập để test bottom navigation
-  // Trong thực tế, bạn sẽ quản lý state đăng nhập ở đây
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  // Mặc định không đăng nhập để hiển thị trang LegalDocuments trước
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   return (
     <AuthProvider>

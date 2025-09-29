@@ -13,10 +13,14 @@ import LawyerManagement from './Admin/LawyerManagement';
 import AdminAccount from './Admin/AdminAccount';
 import UserManagement from './Admin/UserManagement';
 import PostManagement from './Admin/PostManagement';
+import LegalDocuments from './LegalDocuments';
+import LegalDocumentDetail from './LegalDocumentDetail';
 
 const SCREENS = {
     LOGIN: 'Login',
     SIGNUP: 'Signup',
+    LEGAL_DOCUMENTS: 'LegalDocuments',
+    LEGAL_DOCUMENT_DETAIL: 'LegalDocumentDetail',
     HOME: 'Home',
     PROFILE: 'Profile',
     MYPOSTS: 'MyPosts',
@@ -35,4 +39,4 @@ const SCREENS = {
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail };

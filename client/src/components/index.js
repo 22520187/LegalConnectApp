@@ -18,3 +18,5 @@ export { default as LegalExpertiseSection } from './Account/LegalExpertiseSectio
 export { default as EditableSection } from './Account/EditableSection';
 export { default as EditableField } from './Account/EditableField';
 export { default as PasswordSection } from './Account/PasswordSection';
+export { default as LegalDocumentFilter } from './LegalDocumentFilter/LegalDocumentFilter';
+export { default as LegalDocumentCard } from './LegalDocumentCard/LegalDocumentCard';
