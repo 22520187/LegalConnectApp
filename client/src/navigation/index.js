@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Login from '../screens/Auth/Login';
 import SignUp from '../screens/Auth/SignUp';
-import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail } from '../screens';
+import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail, Statistic } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
 const Stack = createStackNavigator();
@@ -149,7 +149,7 @@ const AdminTabNavigator = () => {
     const {isKeyboardVisible} = useIsKeyboardVisible();
     return (
         <Tab.Navigator
-            initialRouteName={SCREENS.POST_MANAGEMENT}
+            initialRouteName={SCREENS.STATISTIC}
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName;
@@ -162,6 +162,8 @@ const AdminTabNavigator = () => {
                         iconName = focused ? 'person' : 'person-outline';
                     } else if (route.name === SCREENS.LAWYER_MANAGEMENT) {
                         iconName = focused ? 'briefcase' : 'briefcase-outline';
+                    } else if (route.name === SCREENS.STATISTIC) {
+                        iconName = focused ? 'bar-chart' : 'bar-chart-outline';
                     }
                     
                     return <Ionicons name={iconName} size={size} color={color} />;
@@ -177,6 +179,13 @@ const AdminTabNavigator = () => {
                 headerShown: false,
             })}
         >
+            <Tab.Screen
+                name={SCREENS.STATISTIC}
+                component={Statistic}
+                options={{
+                    tabBarLabel: 'Thống kê',
+                }}
+            />
             <Tab.Screen
                 name={SCREENS.POST_MANAGEMENT}
                 component={PostManagement}

@@ -15,6 +15,7 @@ import UserManagement from './Admin/UserManagement';
 import PostManagement from './Admin/PostManagement';
 import LegalDocuments from './LegalDocuments';
 import LegalDocumentDetail from './LegalDocumentDetail';
+import Statistic from './Admin/Statistic';
 
 const SCREENS = {
     LOGIN: 'Login',
@@ -36,7 +37,8 @@ const SCREENS = {
     POST_MANAGEMENT: 'PostManagement',
     LAWYER_MANAGEMENT: 'LawyerManagement',
     ADMIN_ACCOUNT: 'AdminAccount',
+    STATISTIC: 'Statistic',
 }
 
 export default SCREENS;
-export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail };
+export { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail, Statistic };
