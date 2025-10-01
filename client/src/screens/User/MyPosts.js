@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
 import SCREENS from '../index';
@@ -93,7 +94,7 @@ const MyPosts = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.title}>Bài đăng</Text>

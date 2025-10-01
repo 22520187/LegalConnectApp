@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { ChatMessage, ChatInput } from '../../components';
@@ -122,7 +122,7 @@ const ChatScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar backgroundColor={COLORS.WHITE} barStyle="dark-content" />
       
       {/* Header */}

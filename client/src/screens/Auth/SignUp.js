@@ -9,9 +9,9 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import COLORS from '../../constant/colors';
@@ -122,7 +122,7 @@ const SignUp = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar backgroundColor={COLORS.WHITE} barStyle="dark-content" />
       
       <KeyboardAvoidingView 

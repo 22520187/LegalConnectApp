@@ -311,6 +311,7 @@ const ProfileSection = () => {
 
       {/* Logout Button */}
       <Pressable style={styles.logoutButton} onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={20} color={COLORS.WHITE} />
         <Text style={styles.logoutText}>Đăng xuất</Text>
       </Pressable>
 
@@ -461,10 +462,12 @@ const styles = StyleSheet.create({
       fontWeight: '500',
     },
     logoutButton: {
-      backgroundColor: '#007AFF',
+      backgroundColor: COLORS.RED || '#dc3545',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: 16,
       borderRadius: 8,
-      alignItems: 'center',
       marginVertical: 24,
     },
     logoutText: {
