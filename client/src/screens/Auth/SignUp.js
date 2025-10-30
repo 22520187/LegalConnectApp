@@ -38,15 +38,10 @@ const SignUp = () => {
   };
 
   const validateForm = () => {
-    const { firstName, lastName, email, password, confirmPassword } = formData;
+    const { fullName, email, password, confirmPassword } = formData;
 
-    if (!firstName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập họ');
-      return false;
-    }
-    
-    if (!lastName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tên');
+    if (!fullName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên đầy đủ');
       return false;
     }
 
@@ -94,7 +89,7 @@ const SignUp = () => {
       try {
         const userData = {
           id: Date.now(),
-          name: `${formData.firstName} ${formData.lastName}`,
+          name: formData.fullName,
           email: formData.email,
         };
 
@@ -151,23 +146,12 @@ const SignUp = () => {
             {/* Name Fields */}
             <View style={styles.nameRow}>
               <View style={styles.nameFieldContainer}>
-                <Text style={styles.label}>Họ *</Text>
+                <Text style={styles.label}>Tên đầy đủ *</Text>
                 <TextInput
                   style={styles.nameInput}
-                  placeholder="Nhập họ của bạn"
-                  value={formData.firstName}
-                  onChangeText={(value) => handleInputChange('firstName', value)}
-                  autoCapitalize="words"
-                />
-              </View>
-              
-              <View style={styles.nameFieldContainer}>
-                <Text style={styles.label}>Tên *</Text>
-                <TextInput
-                  style={styles.nameInput}
-                  placeholder="Nhập tên của bạn"
-                  value={formData.lastName}
-                  onChangeText={(value) => handleInputChange('lastName', value)}
+                  placeholder="Nhập tên đầy đủ của bạn"
+                  value={formData.fullName}
+                  onChangeText={(value) => handleInputChange('fullName', value)}
                   autoCapitalize="words"
                 />
               </View>
