@@ -6,6 +6,7 @@ import { LandingStackNavigator, AuthStackNavigator, UserTabNavigator, AdminTabNa
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import COLORS from './src/constant/colors';
+import Toast from 'react-native-toast-message';
 
 // Component để render navigation dựa trên auth state và role
 const AppNavigator = () => {
@@ -41,6 +42,7 @@ export default function App() {
         <SafeAreaView style={styles.container}>
           <StatusBar style="auto" />
           <AppNavigator />
+          <Toast />
         </SafeAreaView>
       </SafeAreaProvider>
     </AuthProvider>

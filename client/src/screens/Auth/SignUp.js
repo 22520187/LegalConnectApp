@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -20,92 +21,89 @@ import { Ionicons } from '@expo/vector-icons';
 
 const SignUp = () => {
   const navigation = useNavigation();
-  const { login } = useAuth();
+  const { register, loading: authLoading } = useAuth(); // ✅ Sửa: Import register từ useAuth
+  
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    fullName: '', // ✅ Sửa: Đổi thành fullName thay vì firstName/lastName
     email: '',
     password: '',
     confirmPassword: '',
+    phoneNumber: '', // ✅ Thêm phoneNumber
   });
-  const [loading, setLoading] = useState(false);
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error khi user bắt đầu nhập
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
+    }
   };
 
   const validateForm = () => {
-    const { fullName, email, password, confirmPassword } = formData;
+    const newErrors = {};
+    const { fullName, email, password, confirmPassword } = formData; // ✅ Sửa: Sử dụng đúng field names
 
     if (!fullName.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập tên đầy đủ');
-      return false;
+      newErrors.fullName = 'Vui lòng nhập tên đầy đủ';
     }
 
     if (!email.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập email');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Lỗi', 'Email không hợp lệ');
-      return false;
+      newErrors.email = 'Vui lòng nhập email';
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        newErrors.email = 'Email không hợp lệ';
+      }
     }
 
     if (!password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mật khẩu');
-      return false;
+      newErrors.password = 'Vui lòng nhập mật khẩu';
+    } else if (password.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
-    if (password.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
-      return false;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
-      return false;
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Vui lòng xác nhận mật khẩu';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
     }
 
     if (!acceptTerms) {
-      Alert.alert('Lỗi', 'Vui lòng đồng ý với Điều khoản sử dụng');
-      return false;
+      newErrors.terms = 'Vui lòng đồng ý với Điều khoản sử dụng';
     }
 
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSignUp = async () => {
-    if (!validateForm()) return;
+    console.log('handleSignUp called'); // ✅ Debug log
+    
+    if (!validateForm()) {
+      console.log('Validation failed:', errors);
+      return;
+    }
 
-    setLoading(true);
+    console.log('Validation passed, calling register...'); // ✅ Debug log
 
-    // Simulate API call
-    setTimeout(() => {
-      try {
-        const userData = {
-          id: Date.now(),
-          name: formData.fullName,
-          email: formData.email,
-        };
+    const result = await register({
+      email: formData.email.trim(),
+      password: formData.password,
+      fullName: formData.fullName.trim(),
+      phoneNumber: formData.phoneNumber.trim() || null,
+    });
 
-        login(userData);
-        
-        Alert.alert(
-          'Đăng ký thành công!',
-          'Chào mừng bạn đến với Legal Connect',
-          [{ text: 'OK' }]
-        );
-      } catch (error) {
-        Alert.alert('Lỗi', 'Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.');
-      } finally {
-        setLoading(false);
-      }
-    }, 1500);
+    console.log('Register result:', result); // ✅ Debug log
+
+    if (!result.success) {
+      console.log('Register failed:', result.message);
+    }
+    // Success case được handle trong AuthContext và navigation sẽ tự động chuyển
   };
 
   const handleBackToLogin = () => {
@@ -143,43 +141,58 @@ const SignUp = () => {
 
           {/* Form */}
           <View style={styles.form}>
-            {/* Name Fields */}
-            <View style={styles.nameRow}>
-              <View style={styles.nameFieldContainer}>
-                <Text style={styles.label}>Tên đầy đủ *</Text>
-                <TextInput
-                  style={styles.nameInput}
-                  placeholder="Nhập tên đầy đủ của bạn"
-                  value={formData.fullName}
-                  onChangeText={(value) => handleInputChange('fullName', value)}
-                  autoCapitalize="words"
-                />
-              </View>
+            {/* Full Name Field */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Tên đầy đủ *</Text>
+              <TextInput
+                style={[styles.input, errors.fullName && styles.inputError]}
+                placeholder="Nhập tên đầy đủ của bạn"
+                value={formData.fullName}
+                onChangeText={(value) => handleInputChange('fullName', value)}
+                autoCapitalize="words"
+              />
+              {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
             </View>
 
             {/* Email Field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Email *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.email && styles.inputError]}
                 placeholder="Nhập địa chỉ email"
                 value={formData.email}
                 onChangeText={(value) => handleInputChange('email', value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+            </View>
+
+            {/* Phone Number Field (Optional) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Số điện thoại</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nhập số điện thoại (tùy chọn)"
+                value={formData.phoneNumber}
+                onChangeText={(value) => handleInputChange('phoneNumber', value)}
+                keyboardType="phone-pad"
               />
             </View>
 
             {/* Password Field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Mật khẩu *</Text>
-              <View style={styles.passwordContainer}>
+              <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Tối thiểu 6 ký tự"
                   value={formData.password}
                   onChangeText={(value) => handleInputChange('password', value)}
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -192,18 +205,21 @@ const SignUp = () => {
                   />
                 </TouchableOpacity>
               </View>
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
             </View>
 
             {/* Confirm Password Field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Xác nhận mật khẩu *</Text>
-              <View style={styles.passwordContainer}>
+              <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Nhập lại mật khẩu"
                   value={formData.confirmPassword}
                   onChangeText={(value) => handleInputChange('confirmPassword', value)}
                   secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}
@@ -216,6 +232,7 @@ const SignUp = () => {
                   />
                 </TouchableOpacity>
               </View>
+              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
             </View>
 
             {/* Terms and Conditions */}
@@ -235,16 +252,18 @@ const SignUp = () => {
                 <Text style={styles.termsLink}>Chính sách bảo mật</Text>
               </Text>
             </TouchableOpacity>
+            {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
 
             {/* Sign Up Button */}
             <TouchableOpacity
-              style={[styles.signupButton, loading && styles.buttonDisabled]}
+              style={[styles.signupButton, authLoading && styles.buttonDisabled]}
               onPress={handleSignUp}
-              disabled={loading}
+              disabled={authLoading}
             >
-              {loading ? (
+              {authLoading ? (
                 <View style={styles.loadingContainer}>
-                  <Text style={styles.signupButtonText}>Đang đăng ký...</Text>
+                  <ActivityIndicator color={COLORS.WHITE} size="small" />
+                  <Text style={[styles.signupButtonText, { marginLeft: 8 }]}>Đang đăng ký...</Text>
                 </View>
               ) : (
                 <Text style={styles.signupButtonText}>Tạo tài khoản</Text>
@@ -307,15 +326,6 @@ const styles = StyleSheet.create({
   form: {
     flex: 1,
   },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  nameFieldContainer: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
   fieldContainer: {
     marginBottom: 20,
   },
@@ -333,13 +343,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: COLORS.WHITE,
   },
-  nameInput: {
-    borderWidth: 1,
-    borderColor: COLORS.GRAY_BG,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    backgroundColor: COLORS.WHITE,
+  inputError: {
+    borderColor: COLORS.RED,
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -356,6 +361,11 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: 16,
+  },
+  errorText: {
+    color: COLORS.RED,
+    fontSize: 12,
+    marginTop: 4,
   },
   termsContainer: {
     flexDirection: 'row',
@@ -410,38 +420,6 @@ const styles = StyleSheet.create({
     color: COLORS.WHITE,
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.GRAY_BG,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: COLORS.GRAY,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.WHITE,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.GRAY_BG,
-    justifyContent: 'center',
-    marginBottom: 30,
-  },
-  googleButtonText: {
-    marginLeft: 12,
-    fontSize: 16,
-    color: COLORS.BLACK,
-    fontWeight: '500',
   },
   footer: {
     alignItems: 'center',

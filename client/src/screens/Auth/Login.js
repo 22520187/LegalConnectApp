@@ -6,7 +6,8 @@ import {
   TextInput, 
   TouchableOpacity,
   Alert,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -16,112 +17,133 @@ import { Ionicons } from '@expo/vector-icons';
 
 const Login = () => {
   const navigation = useNavigation();
-  const { login } = useAuth();
-  const [email, setEmail] = useState('user@gmail.com');
-  const [password, setPassword] = useState('user123');
-  const [loading, setLoading] = useState(false);
+  const { login, loading: authLoading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!email.trim()) {
+      newErrors.email = 'Email không được để trống';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Email không hợp lệ';
+    }
+    
+    if (!password.trim()) {
+      newErrors.password = 'Mật khẩu không được để trống';
+    } else if (password.length < 6) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
+    if (!validateForm()) {
       return;
     }
 
-    setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Tài khoản user thông thường
-      if (email === 'user@gmail.com' && password === 'user123') {
-        const userData = {
-          id: 1,
-          name: 'Nguyễn Văn An',
-          email: email,
-          role: 'user',
-        };
-        login(userData);
-      }
-      // Tài khoản admin
-      else if (email === 'admin@gmail.com' && password === 'Admin123') {
-        const userData = {
-          id: 2,
-          name: 'Quản Trị Viên',
-          email: email,
-          role: 'admin',
-        };
-        login(userData);
-      } else {
-        Alert.alert('Lỗi', 'Email hoặc mật khẩu không đúng');
-      }
-      setLoading(false);
-    }, 1000);
+    const result = await login({
+      email: email.trim(),
+      password: password,
+    });
+
+    if (!result.success) {
+      // Error đã được hiển thị trong AuthContext
+      console.log('Login failed:', result.message);
+    }
+    // Success case được handle trong AuthContext và navigation sẽ tự động chuyển
   };
 
   const handleSignUp = () => {
     navigation.navigate(SCREENS.SIGNUP);
   };
 
-  const handleGoogleLogin = () => {
-    Alert.alert('Google Login', 'Chức năng đăng nhập bằng Google sẽ được phát triển sau');
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Image source={require('../../../assets/logo.png')} style={styles.logo} />
+        <Image 
+          source={require('../../../assets/logo.png')} 
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>Đăng nhập</Text>
-        <Text style={styles.subtitle}>Chào mừng bạn trở lại Legal Connect</Text>
+        <Text style={styles.subtitle}>Chào mừng bạn quay trở lại!</Text>
       </View>
-      
+
       <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Mật khẩu"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-        
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={[styles.input, errors.email && styles.inputError]}
+            placeholder="Nhập email của bạn"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errors.email) {
+                setErrors(prev => ({ ...prev, email: null }));
+              }
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Mật khẩu</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.passwordInput, errors.password && styles.inputError]}
+              placeholder="Nhập mật khẩu"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) {
+                  setErrors(prev => ({ ...prev, password: null }));
+                }
+              }}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons 
+                name={showPassword ? 'eye-off' : 'eye'} 
+                size={20} 
+                color={COLORS.GRAY} 
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+        </View>
+
         <TouchableOpacity 
-          style={[styles.loginButton, loading && styles.buttonDisabled]} 
+          style={[styles.loginButton, authLoading && styles.disabledButton]}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={authLoading}
         >
-          <Text style={styles.loginButtonText}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </Text>
+          {authLoading ? (
+            <ActivityIndicator color={COLORS.WHITE} size="small" />
+          ) : (
+            <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.signupButton} 
-          onPress={handleSignUp}
-        >
-          <Text style={styles.signupButtonText}>Đăng ký tài khoản mới</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <Text style={styles.demoText}>
-        Demo User: demo@example.com / 123456{'\n'}
-        Demo Admin: admin@example.com / admin123
-      </Text>
-
-      <View style={styles.socialLogin}>
-        <Text style={styles.orText}>
-          Hoặc đăng nhập bằng
-        </Text>
-        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-          <Ionicons name="logo-google" size={20} color="#DB4437" />
-          <Text style={styles.googleButtonText}>Đăng nhập với Google</Text>
-        </TouchableOpacity>
+        <View style={styles.signupContainer}>
+          <Text style={styles.signupText}>Chưa có tài khoản? </Text>
+          <TouchableOpacity onPress={handleSignUp}>
+            <Text style={styles.signupLink}>Đăng ký ngay</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -130,13 +152,18 @@ const Login = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     backgroundColor: COLORS.WHITE,
     padding: 20,
   },
   header: {
     alignItems: 'center',
+    marginTop: 50,
     marginBottom: 40,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
   },
   title: {
     fontSize: 28,
@@ -147,34 +174,60 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: COLORS.GRAY,
-    textAlign: 'center',
   },
   form: {
-    width: '100%',
-    marginBottom: 30,
+    flex: 1,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.BLACK,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: COLORS.GRAY_BG,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderColor: COLORS.LIGHT_GRAY,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
     backgroundColor: COLORS.WHITE,
   },
+  inputError: {
+    borderColor: COLORS.RED,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.LIGHT_GRAY,
+    borderRadius: 8,
+    backgroundColor: COLORS.WHITE,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 0,
+  },
+  eyeIcon: {
+    padding: 12,
+  },
+  errorText: {
+    color: COLORS.RED,
+    fontSize: 14,
+    marginTop: 4,
+  },
   loginButton: {
     backgroundColor: COLORS.BLUE,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     alignItems: 'center',
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginTop: 20,
   },
-  buttonDisabled: {
+  disabledButton: {
     backgroundColor: COLORS.GRAY,
   },
   loginButtonText: {
@@ -182,56 +235,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  signupButton: {
-    backgroundColor: COLORS.WHITE,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.BLUE,
-  },
-  signupButtonText: {
-    color: COLORS.BLUE,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  demoText: {
-    fontSize: 12,
-    color: COLORS.GRAY,
-    textAlign: 'center',
-    marginBottom: 30,
-    fontStyle: 'italic',
-  },
-  socialLogin: {
-    alignItems: 'center',
-  },
-  orText: {
-    fontSize: 14,
-    color: COLORS.GRAY,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  googleButton: {
+  signupContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.WHITE,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.GRAY_BG,
-    width: '100%',
     justifyContent: 'center',
+    marginTop: 30,
   },
-  googleButtonText: {
-    marginLeft: 12,
+  signupText: {
     fontSize: 16,
-    color: COLORS.BLACK,
-    fontWeight: '500',
+    color: COLORS.GRAY,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
+  signupLink: {
+    fontSize: 16,
+    color: COLORS.BLUE,
+    fontWeight: 'bold',
   },
 });
 
