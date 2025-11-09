@@ -9,57 +9,222 @@ import {
   Platform,
   StatusBar,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, ChatInput } from '../../components';
 import COLORS from '../../constant/colors';
+import {
+  getConversationMessages,
+  sendMessage,
+  markConversationAsRead,
+} from '../../services/MessageService';
 
 const ChatScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { userId, userName, userAvatar, isOnline } = route.params;
+  const { conversationId, userId, userName, userAvatar, isOnline } = route.params || {};
   
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const scrollViewRef = useRef(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  // Mock messages data
+  // Load messages function
+  const loadMessages = async () => {
+    if (!conversationId) {
+      console.error('❌ No conversationId provided!');
+      Alert.alert('Lỗi', 'Không tìm thấy conversation ID');
+      setIsLoadingMessages(false);
+      return;
+    }
+
+    try {
+      setIsLoadingMessages(true);
+      // Load current user ID - ensure it's loaded before processing messages
+      let actualUserId = currentUserId;
+      if (!actualUserId) {
+        try {
+          // Try 'user' key first (as used in AuthService)
+          let userData = await AsyncStorage.getItem('user');
+          if (userData) {
+            const user = JSON.parse(userData);
+            actualUserId = user.id || user.userId;
+            setCurrentUserId(actualUserId);
+          } else {
+            // Try 'userData' key as fallback
+            userData = await AsyncStorage.getItem('userData');
+            if (userData) {
+              const user = JSON.parse(userData);
+              actualUserId = user.id || user.userId;
+              setCurrentUserId(actualUserId);
+              console.log('✅ Current user ID loaded from AsyncStorage (key: "userData"):', actualUserId);
+            } else {
+              console.error('❌ No user data found in AsyncStorage (tried "user" and "userData")');
+            }
+          }
+        } catch (error) {
+          console.error('Error loading current user:', error);
+        }
+      } else {
+        console.log('✅ Current user ID from state:', actualUserId);
+        console.log('✅ User ID type:', typeof actualUserId);
+      }
+      
+      // Double check - if still no userId, try one more time with different keys
+      if (!actualUserId) {
+        console.warn('⚠️ actualUserId still not set, trying one more time...');
+        try {
+          const keys = ['user', 'userData', 'currentUser'];
+          for (const key of keys) {
+            const userData = await AsyncStorage.getItem(key);
+            if (userData) {
+              try {
+                const user = JSON.parse(userData);
+                actualUserId = user.id || user.userId || user.user?.id;
+                if (actualUserId) {
+                  setCurrentUserId(actualUserId);
+                  console.log(`✅ Current user ID loaded from key "${key}":`, actualUserId);
+                  break;
+                }
+              } catch (e) {
+                console.warn(`Failed to parse data from key "${key}"`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error loading current user (retry):', error);
+        }
+      }
+  
+      const data = await getConversationMessages(conversationId);
+      
+      if (!data) {
+        console.warn('⚠️ No data received');
+        setMessages([]);
+        return;
+      }
+      
+      if (!Array.isArray(data)) {
+        console.warn('⚠️ Invalid data format, expected array:', data);
+        setMessages([]);
+        return;
+      }
+      
+      // Ensure actualUserId is set
+      if (!actualUserId) {
+        console.error('❌ actualUserId is not set!');
+        Alert.alert('Lỗi', 'Không thể xác định người dùng hiện tại');
+        setIsLoadingMessages(false);
+        return;
+      }
+      
+      // Convert to numbers for comparison (in case they're strings)
+      const currentUserIdNum = Number(actualUserId);
+      
+      // Transform API data to match component format
+      const transformedMessages = data.map((msg, index) => {
+        const senderIdNum = Number(msg.senderId);
+        const isUserMessage = senderIdNum === currentUserIdNum;
+        
+        console.log(`Message ${index + 1}:`, {
+          senderId: msg.senderId,
+          senderIdNum: senderIdNum,
+          currentUserId: actualUserId,
+          currentUserIdNum: currentUserIdNum,
+          isUser: isUserMessage,
+          comparison: `${senderIdNum} === ${currentUserIdNum} = ${isUserMessage}`
+        });
+        
+        return {
+          id: msg.id,
+          message: msg.content,
+          isUser: isUserMessage, // Message is from current user
+          timestamp: new Date(msg.createdAt).toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          senderId: msg.senderId,
+        };
+      });
+      
+      setMessages(transformedMessages);
+      
+      // Mark conversation as read
+      try {
+        await markConversationAsRead(conversationId);
+        console.log('✅ Conversation marked as read');
+      } catch (error) {
+        console.warn('⚠️ Failed to mark as read:', error);
+      }
+      
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể tải tin nhắn. Vui lòng thử lại.');
+      setMessages([]);
+    } finally {
+      setIsLoadingMessages(false);
+      scrollToBottom();
+    }
+  };
+
+  // Load user and messages when component mounts or conversationId changes
   useEffect(() => {
-    const mockMessages = [
-      {
-        id: 1,
-        message: "Xin chào! Tôi cần tư vấn về vấn đề hợp đồng lao động.",
-        isUser: false,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderId: userId,
-      },
-      {
-        id: 2,
-        message: "Chào bạn! Tôi có thể giúp bạn tư vấn về vấn đề này. Bạn có thể mô tả chi tiết tình huống của mình không?",
-        isUser: true,
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderId: 'me',
-      },
-      {
-        id: 3,
-        message: "Công ty tôi muốn chấm dứt hợp đồng lao động với tôi mà không có lý do chính đáng. Họ nói là do cắt giảm nhân sự nhưng tôi thấy họ vẫn tuyển người mới cho vị trí tương tự.",
-        isUser: false,
-        timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderId: userId,
-      },
-      {
-        id: 4,
-        message: "Theo Bộ luật Lao động 2019, công ty không được chấm dứt hợp đồng lao động tùy tiện. Nếu họ nói do cắt giảm nhân sự nhưng vẫn tuyển người mới cho cùng vị trí, đây có thể là vi phạm pháp luật.\n\nBạn đã làm việc ở công ty bao lâu rồi? Và hợp đồng của bạn thuộc loại nào?",
-        isUser: true,
-        timestamp: new Date(Date.now() - 30 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderId: 'me',
-      },
-    ];
+    const initialize = async () => {
+      try {
+        console.log('🔄 Initializing ChatScreen...');
+        
+        // Load user data - try 'user' key first (as used in AuthService)
+        try {
+          let userData = await AsyncStorage.getItem('user');
+          if (userData) {
+            const user = JSON.parse(userData);
+            const userId = user.id || user.userId;
+            if (userId) {
+              setCurrentUserId(userId);
+              console.log('✅ User ID set from "user" key:', userId);
+            } else {
+              console.warn('⚠️ User object found but no id field:', user);
+            }
+          } else {
+            // Try 'userData' as fallback
+            userData = await AsyncStorage.getItem('userData');
+            if (userData) {
+              const user = JSON.parse(userData);
+              const userId = user.id || user.userId;
+              if (userId) {
+                setCurrentUserId(userId);
+                console.log('✅ User ID set from "userData" key:', userId);
+              }
+            } else {
+              console.warn('⚠️ No user data in AsyncStorage (tried "user" and "userData")');
+            }
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+        
+        // Load messages
+        if (conversationId) {
+          console.log('✅ conversationId exists, loading messages...');
+          await loadMessages();
+        } else {
+          console.error('❌ conversationId is missing!');
+          Alert.alert('Lỗi', 'Không tìm thấy conversation ID');
+          setIsLoadingMessages(false);
+        }
+      } catch (error) {
+        console.error('Error initializing:', error);
+        setIsLoadingMessages(false);
+      }
+    };
     
-    setMessages(mockMessages);
-  }, [userId]);
+    initialize();
+  }, [conversationId]); // Re-run if conversationId changes
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -67,46 +232,38 @@ const ChatScreen = () => {
     }, 100);
   };
 
-  const handleSendMessage = async (message) => {
-    // Add user message
-    const userMessage = {
-      id: Date.now(),
-      message: message,
-      isUser: true,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      senderId: 'me',
-    };
+  const handleSendMessage = async (messageContent) => {
+    if (!messageContent.trim() || !conversationId) {
+      return;
+    }
 
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    scrollToBottom();
+    try {
+      setIsLoading(true);
 
-    // Simulate response (in real app, this would be WebSocket or API call)
-    setTimeout(() => {
-      const botResponse = {
-        id: Date.now() + 1,
-        message: generateResponse(message),
-        isUser: false,
-        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderId: userId,
+      // Send message via API
+      const sentMessage = await sendMessage(conversationId, messageContent.trim());
+      
+      // Add to local messages immediately
+      const newMessage = {
+        id: sentMessage.id,
+        message: sentMessage.content,
+        isUser: true,
+        timestamp: new Date(sentMessage.createdAt).toLocaleTimeString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        senderId: sentMessage.senderId,
       };
 
-      setMessages(prev => [...prev, botResponse]);
-      setIsLoading(false);
+      setMessages(prev => [...prev, newMessage]);
       scrollToBottom();
-    }, 1000);
-  };
 
-  const generateResponse = (message) => {
-    const responses = [
-      "Cảm ơn bạn đã chia sẻ thông tin. Tôi sẽ xem xét và tư vấn cho bạn.",
-      "Đây là một vấn đề khá phức tạp. Bạn có thể cung cấp thêm chi tiết không?",
-      "Theo hiểu biết của tôi, trong trường hợp này bạn có thể làm như sau...",
-      "Tôi khuyên bạn nên lưu giữ tất cả bằng chứng liên quan đến vấn đề này.",
-      "Bạn có thể liên hệ với Sở Lao động địa phương để được hỗ trợ thêm.",
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Lỗi', 'Không thể gửi tin nhắn. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleProfilePress = () => {
@@ -118,8 +275,45 @@ const ChatScreen = () => {
   };
 
   const handleMoreOptions = () => {
-    // Handle more options like block, report, etc.
+    Alert.alert(
+      'Tùy chọn',
+      'Chọn hành động',
+      [
+        { text: 'Xem hồ sơ', onPress: handleProfilePress },
+        { text: 'Báo cáo', onPress: () => {/* Handle report */} },
+        { text: 'Chặn người dùng', onPress: () => {/* Handle block */} },
+        { text: 'Hủy', style: 'cancel' },
+      ]
+    );
   };
+
+  // Show loading indicator while loading messages
+  if (isLoadingMessages) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar backgroundColor={COLORS.WHITE} barStyle="dark-content" />
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.BLACK} />
+          </TouchableOpacity>
+          
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{userName}</Text>
+          </View>
+        </View>
+
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.BLUE} />
+          <Text style={styles.loadingText}>Đang tải tin nhắn...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -179,20 +373,28 @@ const ChatScreen = () => {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
         >
-          {messages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg.message}
-              isUser={msg.isUser}
-              timestamp={msg.timestamp}
-            />
-          ))}
+          {messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={64} color={COLORS.GRAY} />
+              <Text style={styles.emptyText}>Chưa có tin nhắn nào</Text>
+              <Text style={styles.emptySubtext}>Gửi tin nhắn đầu tiên để bắt đầu trò chuyện</Text>
+            </View>
+          ) : (
+            messages.map((msg) => (
+              <ChatMessage
+                key={msg.id}
+                message={msg.message}
+                isUser={msg.isUser}
+                timestamp={msg.timestamp}
+              />
+            ))
+          )}
           
           {/* Loading indicator */}
           {isLoading && (
-            <View style={styles.loadingContainer}>
+            <View style={styles.loadingMessageContainer}>
               <View style={styles.loadingBubble}>
-                <Text style={styles.loadingText}>Đang nhập...</Text>
+                <Text style={styles.loadingMessageText}>Đang gửi...</Text>
               </View>
             </View>
           )}
@@ -202,6 +404,7 @@ const ChatScreen = () => {
         <ChatInput
           onSendMessage={handleSendMessage}
           placeholder="Nhập tin nhắn..."
+          disabled={isLoading}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -289,8 +492,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   loadingContainer: {
-    paddingHorizontal: 16,
-    marginVertical: 4,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingBubble: {
     backgroundColor: COLORS.WHITE,
@@ -304,6 +508,34 @@ const styles = StyleSheet.create({
     maxWidth: '85%',
   },
   loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.GRAY,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.GRAY_DARK,
+  },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.GRAY,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingMessageContainer: {
+    paddingHorizontal: 16,
+    marginVertical: 4,
+  },
+  loadingMessageText: {
     fontSize: 15,
     color: COLORS.GRAY,
     fontStyle: 'italic',

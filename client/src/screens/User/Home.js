@@ -3,130 +3,131 @@ import { View, StyleSheet, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, FilterTabs, QuestionList, FloatingActionButton } from '../../components';
 import COLORS from '../../constant/colors';
+import ForumService from '../../services/ForumService';
+import { useAuth } from '../../context/AuthContext';
+import Toast from 'react-native-toast-message';
+
+// Helper function to strip HTML tags and create summary
+const stripHtml = (html = '') => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, '').trim();
+};
+
+const createSummary = (content = '', maxLength = 150) => {
+    const plainText = stripHtml(content);
+    if (plainText.length <= maxLength) return plainText;
+    return plainText.substring(0, maxLength) + '...';
+};
+
+// Map PostDto to question format for UI
+const mapPostToQuestion = (post) => {
+    const tagsArray = post.tags ? (Array.isArray(post.tags) ? post.tags : Array.from(post.tags)) : [];
+    
+    return {
+        id: post.id,
+        title: post.title || '',
+        summary: createSummary(post.content || ''),
+        voteCount: post.views || 0, // Using views as voteCount for now
+        answerCount: post.replyCount || 0,
+        viewCount: post.views || 0,
+        tags: tagsArray,
+        author: {
+            id: post.author?.id || null,
+            name: post.author?.name || 'Unknown',
+            avatar: post.author?.avatar || null,
+        },
+        createdAt: post.createdAt ? new Date(post.createdAt) : new Date(),
+        hasAcceptedAnswer: post.solved || false,
+    };
+};
 
 const Home = ({ navigation }) => {
     const [activeTab, setActiveTab] = useState('newest');
     const [questions, setQuestions] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const { user } = useAuth();
 
-    // Mock user data
-    const user = {
-        name: 'John Doe',
-        avatar: null, // URL to avatar image or null for default
+    // User data for header
+    const userDisplay = {
+        name: user?.fullName || user?.name || 'Guest',
+        avatar: user?.avatar || null,
     };
 
-    // Mock questions data
-    const mockQuestions = [
-        {
-            id: 1,
-            title: 'What are the legal requirements for starting a business in Vietnam?',
-            summary: 'I want to start a small business and need to understand the legal procedures, required documents, and regulations...',
-            voteCount: 15,
-            answerCount: 3,
-            viewCount: 124,
-            tags: ['Business Law', 'Startup', 'Vietnam'],
-            author: {
-                id: 1,
-                name: 'Alice Johnson',
-                avatar: null,
-            },
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            hasAcceptedAnswer: true,
-        },
-        {
-            id: 2,
-            title: 'Employment contract termination rights in Vietnam',
-            summary: 'My employer wants to terminate my contract. What are my rights and what compensation should I expect?',
-            voteCount: 8,
-            answerCount: 5,
-            viewCount: 89,
-            tags: ['Employment Law', 'Contract', 'Rights'],
-            author: {
-                id: 2,
-                name: 'Mike Chen',
-                avatar: null,
-            },
-            createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-            hasAcceptedAnswer: false,
-        },
-        {
-            id: 3,
-            title: 'Intellectual property protection for software developers',
-            summary: 'How can I protect my mobile app idea and source code from being copied by competitors?',
-            voteCount: 12,
-            answerCount: 0,
-            viewCount: 67,
-            tags: ['IP Law', 'Software', 'Copyright'],
-            author: {
-                id: 3,
-                name: 'Sarah Wilson',
-                avatar: null,
-            },
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-            hasAcceptedAnswer: false,
-        },
-        {
-            id: 4,
-            title: 'Real estate purchase agreement review needed',
-            summary: 'I am buying my first house and the contract seems complex. What should I look out for?',
-            voteCount: 6,
-            answerCount: 2,
-            viewCount: 45,
-            tags: ['Real Estate', 'Contract Review', 'Property'],
-            author: {
-                id: 4,
-                name: 'David Brown',
-                avatar: null,
-            },
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-            hasAcceptedAnswer: false,
-        },
-        {
-            id: 5,
-            title: 'Divorce proceedings and child custody laws',
-            summary: 'What should I know about divorce procedures and how child custody is determined in Vietnamese law?',
-            voteCount: 20,
-            answerCount: 7,
-            viewCount: 203,
-            tags: ['Family Law', 'Divorce', 'Child Custody'],
-            author: {
-                id: 5,
-                name: 'Emma Davis',
-                avatar: null,
-            },
-            createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-            hasAcceptedAnswer: true,
-        },
-    ];
-
     useEffect(() => {
-        loadQuestions();
+        loadQuestions(true);
     }, [activeTab]);
 
-    const loadQuestions = () => {
-        setLoading(true);
-        // Simulate API call delay
-        setTimeout(() => {
-            let filteredQuestions = [...mockQuestions];
-            
-            // Filter based on active tab
+    const loadQuestions = async (resetPage = false) => {
+        try {
+            if (resetPage) {
+                setPage(0);
+                setLoading(true);
+            }
+
+            const currentPage = resetPage ? 0 : page;
+
+            // Determine sort order based on active tab
+            let sort = 'createdAt,desc';
+            let filterUnanswered = false;
+
             switch (activeTab) {
                 case 'hot':
-                    filteredQuestions = filteredQuestions.sort((a, b) => b.voteCount - a.voteCount);
+                    sort = 'views,desc'; // Sort by views for hot posts
                     break;
                 case 'unanswered':
-                    filteredQuestions = filteredQuestions.filter(q => q.answerCount === 0);
+                    sort = 'createdAt,desc';
+                    filterUnanswered = true; // Filter on frontend or backend
                     break;
                 case 'newest':
                 default:
-                    filteredQuestions = filteredQuestions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    sort = 'createdAt,desc';
                     break;
             }
-            
-            setQuestions(filteredQuestions);
+
+            const response = await ForumService.getPosts({
+                page: currentPage,
+                size: 20,
+                sort: sort,
+            });
+
+            // Spring Page response structure: { content: [], totalElements, totalPages, number, size }
+            const posts = response.content || [];
+            let mappedQuestions = posts.map(mapPostToQuestion);
+
+            // Filter unanswered on frontend if needed
+            if (filterUnanswered && activeTab === 'unanswered') {
+                mappedQuestions = mappedQuestions.filter(q => q.answerCount === 0);
+            }
+
+            if (resetPage) {
+                setQuestions(mappedQuestions);
+            } else {
+                setQuestions(prev => [...prev, ...mappedQuestions]);
+            }
+
+            // Check if there are more pages
+            const totalPages = response.totalPages || 0;
+            setHasMore(currentPage < totalPages - 1);
+
+            if (!resetPage) {
+                setPage(prev => prev + 1);
+            } else {
+                setPage(1);
+            }
+        } catch (error) {
+            console.error('Error loading questions:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Lỗi tải dữ liệu',
+                text2: error.message || 'Không thể tải danh sách bài viết',
+            });
+        } finally {
             setLoading(false);
-        }, 500);
+            setRefreshing(false);
+        }
     };
 
     const handleTabChange = (tab) => {
@@ -145,17 +146,15 @@ const Home = ({ navigation }) => {
         navigation.navigate('QuestionDetail', { question });
     };
 
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
         setRefreshing(true);
-        setTimeout(() => {
-            loadQuestions();
-            setRefreshing(false);
-        }, 1000);
+        await loadQuestions(true);
     };
 
     const handleLoadMore = () => {
-        // Implement pagination here
-        console.log('Load more questions');
+        if (!loading && hasMore) {
+            loadQuestions(false);
+        }
     };
 
     const handleAddQuestion = () => {
@@ -173,7 +172,7 @@ const Home = ({ navigation }) => {
                 <AppHeader
                     onSearch={handleSearch}
                     onNotification={handleNotification}
-                    user={user}
+                    user={userDisplay}
                 />
                 
                 <FilterTabs
@@ -191,6 +190,7 @@ const Home = ({ navigation }) => {
                         loading={loading}
                     />
                 </View>
+                <Toast />
                 
                 {/* <FloatingActionButton onPress={handleAddQuestion} /> */}
             </SafeAreaView>

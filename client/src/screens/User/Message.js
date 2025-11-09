@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,85 +7,81 @@ import {
   TouchableOpacity,
   StatusBar,
   Image,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import COLORS from '../../constant/colors';
+import { getUserConversations } from '../../services/MessageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Message = () => {
   const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  // Mock data cho danh sách cuộc trò chuyện
-  const [conversations] = useState([
-    {
-      id: 1,
-      user: {
-        id: 1,
-        name: 'Luật sư Nguyễn Văn A',
-        avatar: null,
-        isOnline: true,
-      },
-      lastMessage: {
-        text: 'Cảm ơn bạn đã tư vấn về vấn đề hợp đồng lao động',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-        isRead: true,
-        senderId: 1,
-      },
-      unreadCount: 0,
-    },
-    {
-      id: 2,
-      user: {
-        id: 2,
-        name: 'Trần Thị B',
-        avatar: null,
-        isOnline: false,
-      },
-      lastMessage: {
-        text: 'Tôi cần hỏi thêm về quy trình ly hôn',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-        isRead: false,
-        senderId: 2,
-      },
-      unreadCount: 2,
-    },
-    {
-      id: 3,
-      user: {
-        id: 3,
-        name: 'Lê Văn C',
-        avatar: null,
-        isOnline: true,
-      },
-      lastMessage: {
-        text: 'Bạn có thể gửi cho tôi mẫu đơn khởi kiện được không?',
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-        isRead: true,
-        senderId: 3,
-      },
-      unreadCount: 0,
-    },
-    {
-      id: 4,
-      user: {
-        id: 4,
-        name: 'Phạm Thu D',
-        avatar: null,
-        isOnline: false,
-      },
-      lastMessage: {
-        text: 'Xin chào, tôi muốn tư vấn về tranh chấp đất đai',
-        timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        isRead: true,
-        senderId: 4,
-      },
-      unreadCount: 0,
-    },
-  ]);
+  // Load current user ID
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const userData = await AsyncStorage.getItem('userData');
+        if (userData) {
+          const user = JSON.parse(userData);
+          setCurrentUserId(user.id);
+        }
+      } catch (error) {
+        console.error('Error loading current user:', error);
+      }
+    };
+    loadCurrentUser();
+  }, []);
+
+  // Load conversations when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      loadConversations();
+    }, [])
+  );
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const data = await getUserConversations();
+      
+      // Transform API data to match component format
+      const transformedConversations = (data || []).map(conv => ({
+        id: conv.id,
+        user: {
+          id: conv.participant?.id,
+          name: conv.participant?.name || 'Người dùng',
+          avatar: conv.participant?.avatar || null,
+          isOnline: conv.participant?.online || false,
+        },
+        lastMessage: conv.lastMessage ? {
+          text: conv.lastMessage.content || '',
+          timestamp: new Date(conv.lastMessage.timestamp),
+          isRead: false, // Will be determined by unreadCount
+          senderId: conv.lastMessage.senderId,
+        } : null,
+        unreadCount: conv.unreadCount || 0,
+      }));
+      
+      setConversations(transformedConversations);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách tin nhắn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatMessageTime = (timestamp) => {
+    if (!timestamp) return '';
     const now = new Date();
     const messageTime = new Date(timestamp);
     const diffInMinutes = Math.floor((now - messageTime) / (1000 * 60));
@@ -102,19 +98,30 @@ const Message = () => {
   };
 
   const handleConversationPress = (conversation) => {
+    console.log('=== Conversation Pressed ===');
+    console.log('Conversation object:', conversation);
+    console.log('Conversation ID:', conversation.id);
+    console.log('User ID:', conversation.user?.id);
+    console.log('User Name:', conversation.user?.name);
+    
+    if (!conversation.id) {
+      Alert.alert('Lỗi', 'Không tìm thấy conversation ID');
+      return;
+    }
+    
     navigation.navigate('ChatScreen', { 
-      userId: conversation.user.id,
-      userName: conversation.user.name,
-      userAvatar: conversation.user.avatar,
-      isOnline: conversation.user.isOnline,
+      conversationId: conversation.id,
+      userId: conversation.user?.id,
+      userName: conversation.user?.name || 'Người dùng',
+      userAvatar: conversation.user?.avatar,
+      isOnline: conversation.user?.isOnline || false,
     });
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await loadConversations();
+    setRefreshing(false);
   };
 
   const renderConversationItem = ({ item }) => (
@@ -142,7 +149,7 @@ const Message = () => {
           </Text>
           <View style={styles.timeAndBadge}>
             <Text style={styles.messageTime}>
-              {formatMessageTime(item.lastMessage.timestamp)}
+              {formatMessageTime(item.lastMessage?.timestamp)}
             </Text>
             {item.unreadCount > 0 && (
               <View style={styles.unreadBadge}>
@@ -157,11 +164,11 @@ const Message = () => {
         <Text
           style={[
             styles.lastMessage,
-            !item.lastMessage.isRead && item.lastMessage.senderId !== 'me' && styles.unreadMessage
+            item.unreadCount > 0 && item.lastMessage?.senderId !== currentUserId && styles.unreadMessage
           ]}
           numberOfLines={2}
         >
-          {item.lastMessage.text}
+          {item.lastMessage?.text || 'Bắt đầu trò chuyện...'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -190,17 +197,29 @@ const Message = () => {
       </View>
 
       {/* Conversations List */}
-      <FlatList
-        data={conversations}
-        renderItem={renderConversationItem}
-        keyExtractor={(item) => item.id.toString()}
-        style={styles.conversationsList}
-        showsVerticalScrollIndicator={false}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={conversations.length === 0 ? styles.emptyList : null}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.BLUE} />
+          <Text style={styles.loadingText}>Đang tải tin nhắn...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={conversations}
+          renderItem={renderConversationItem}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.conversationsList}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[COLORS.BLUE]}
+            />
+          }
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={conversations.length === 0 ? styles.emptyList : null}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -341,6 +360,16 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.GRAY,
   },
 });
 

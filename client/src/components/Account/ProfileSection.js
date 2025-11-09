@@ -145,14 +145,9 @@ const ProfileSection = () => {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Đăng xuất',
-          onPress: () => {
+          onPress: async () => {
             try {
-              logout();
-              Toast.show({
-                type: 'success',
-                text1: 'Đăng xuất thành công',
-                text2: 'Hẹn gặp lại bạn!'
-              });
+              await logout();
             } catch (error) {
               Alert.alert('Lỗi', 'Không thể đăng xuất. Vui lòng thử lại.');
             }

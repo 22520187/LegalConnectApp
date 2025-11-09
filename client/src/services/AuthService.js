@@ -1,53 +1,40 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL } from '@env';
-
-const API_BASE_URL = (API_URL ? API_URL.replace(/['"\s]+/g, '') : 'http://localhost:8080') + '/api';
+import apiClient from './ApiClient';
 
 class AuthService {
-    constructor() {
-        this.baseUrl = API_BASE_URL;
-    }
-
-    // Helper method để tạo request headers
-  getHeaders(includeAuth = false) {
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-
-    if (includeAuth) {
-      // Có thể thêm authorization header nếu cần
-    }
-
-    return headers;
-  }
-
-  // Helper method để handle response
-  async handleResponse(response) {
-    const data = await response.json();
+  // Helper method để handle response từ apiClient
+  handleResponse(response) {
+    // apiClient đã handle validation status và parse JSON
+    // Chỉ cần format lại response cho AuthContext
+    const data = response.data;
     
-    if (!response.ok) {
-      throw new Error(data.message || 'Something went wrong');
+    // Kiểm tra nếu response có status 2xx
+    if (response.status >= 200 && response.status < 300) {
+      // Backend trả về format: { success, data, message }
+      return data;
+    } else {
+      // Error case (shouldn't happen vì apiClient.interceptor đã reject)
+      const errorMessage = data?.message || data?.error || 'Something went wrong';
+      throw new Error(errorMessage);
     }
-    
-    return data;
   }
 
   // Đăng ký người dùng mới
   async signup(userData) {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/register`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          email: userData.email,
-          password: userData.password,
-          fullName: userData.fullName,
-          phoneNumber: userData.phoneNumber || null,
-        }),
-        credentials: 'include', // Để nhận cookies từ server
+      const response = await apiClient.post('/auth/register', {
+        email: userData.email,
+        password: userData.password,
+        fullName: userData.fullName,
+        phoneNumber: userData.phoneNumber || null,
       });
 
-      const result = await this.handleResponse(response);
+      const result = this.handleResponse(response);
+      
+      // Lưu token nếu có
+      if (result.success && result.data?.token) {
+        await AsyncStorage.setItem('userToken', result.data.token);
+      }
       
       // Lưu thông tin user vào AsyncStorage
       if (result.success && result.data) {
@@ -65,17 +52,17 @@ class AuthService {
   // Đăng nhập
   async signin(credentials) {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password,
-        }),
-        credentials: 'include', // Để nhận cookies từ server
+      const response = await apiClient.post('/auth/login', {
+        email: credentials.email,
+        password: credentials.password,
       });
 
-      const result = await this.handleResponse(response);
+      const result = this.handleResponse(response);
+      
+      // Lưu token nếu có
+      if (result.success && result.data?.token) {
+        await AsyncStorage.setItem('userToken', result.data.token);
+      }
       
       // Lưu thông tin user vào AsyncStorage
       if (result.success && result.data) {
@@ -93,21 +80,19 @@ class AuthService {
   // Đăng xuất
   async logout() {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/logout`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        credentials: 'include',
-      });
+      const response = await apiClient.post('/auth/logout');
 
       // Xóa thông tin local storage
       await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('isAuthenticated');
       
-      return await this.handleResponse(response);
+      return this.handleResponse(response);
     } catch (error) {
       console.error('Logout error:', error);
       // Vẫn xóa local storage ngay cả khi API call thất bại
       await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('isAuthenticated');
       throw error;
     }
@@ -116,13 +101,9 @@ class AuthService {
   // Lấy thông tin user hiện tại
   async getCurrentUser() {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/me`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-        credentials: 'include',
-      });
+      const response = await apiClient.get('/auth/me');
 
-      const result = await this.handleResponse(response);
+      const result = this.handleResponse(response);
       
       // Cập nhật thông tin user trong AsyncStorage
       if (result.success && result.data) {
@@ -139,12 +120,8 @@ class AuthService {
   // Kiểm tra trạng thái authentication
   async checkAuthStatus() {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/status`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-        credentials: 'include',
-      });
-      return await this.handleResponse(response);
+      const response = await apiClient.get('/auth/status');
+      return this.handleResponse(response);
     } catch (error) {
       console.error('Check auth status error:', error);
       throw error;
@@ -171,6 +148,7 @@ class AuthService {
   async clearStoredAuth() {
     try {
       await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('isAuthenticated');
     } catch (error) {
       console.error('Clear stored auth error:', error);
