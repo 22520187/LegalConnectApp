@@ -53,8 +53,11 @@ const Message = () => {
       setLoading(true);
       const data = await getUserConversations();
       
+      // Đảm bảo luôn có array để map
+      const conversationsArray = Array.isArray(data) ? data : [];
+      
       // Transform API data to match component format
-      const transformedConversations = (data || []).map(conv => ({
+      const transformedConversations = conversationsArray.map(conv => ({
         id: conv.id,
         user: {
           id: conv.participant?.id,
@@ -65,7 +68,7 @@ const Message = () => {
         lastMessage: conv.lastMessage ? {
           text: conv.lastMessage.content || '',
           timestamp: new Date(conv.lastMessage.timestamp),
-          isRead: false, // Will be determined by unreadCount
+          isRead: false,
           senderId: conv.lastMessage.senderId,
         } : null,
         unreadCount: conv.unreadCount || 0,
@@ -74,6 +77,9 @@ const Message = () => {
       setConversations(transformedConversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      // Set empty array khi có lỗi
+      setConversations([]);
       Alert.alert('Lỗi', 'Không thể tải danh sách tin nhắn. Vui lòng thử lại.');
     } finally {
       setLoading(false);

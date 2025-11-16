@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useNavigation } from '@react-navigation/native';
@@ -12,24 +12,85 @@ import LawyerRequestModal from '../LawyerRequestModal/LawyerRequestModal';
 import COLORS from '../../constant/colors';
 import SCREENS from '../../screens';
 import { useAuth } from '../../context/AuthContext';
+import UserService from '../../services/UserService';
 
 const ProfileSection = () => {
   const navigation = useNavigation();
-  const { logout } = useAuth();
-  // Mock user data for frontend-only version
+  const { logout, user: currentUser } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState({
-    name: 'Nguyễn Văn An',
-    bio: 'Luật sư có 5 năm kinh nghiệm trong lĩnh vực tư vấn pháp luật dân sự và hình sự. Tốt nghiệp Đại học Luật Hà Nội, từng làm việc tại nhiều văn phòng luật uy tín.',
-    legalExpertise: ['Luật Dân sự', 'Luật Hình sự', 'Luật Gia đình'],
-    id: 1,
-    first_name: 'Nguyễn Văn',
-    last_name: 'An',
-    followers: 100,
-    reputation: 100,
-    lawyerRequestStatus: null, // null, 'pending', 'approved', 'rejected'
+    name: '',
+    bio: '',
+    legalExpertise: [],
+    id: null,
+    first_name: '',
+    last_name: '',
+    followers: 0,
+    reputation: 0,
+    lawyerRequestStatus: null,
+    postCount: 0,
+    replyCount: 0,
+    avatar: null,
+    email: '',
+    phoneNumber: '',
+    joinedAt: null,
   });
 
   const [showLawyerRequestModal, setShowLawyerRequestModal] = useState(false);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, [currentUser]);
+
+  const loadUserProfile = async () => {
+    try {
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      // Lấy userId từ currentUser (có thể là user.id hoặc user.userId)
+      const userId = currentUser.id || currentUser.userId;
+      
+      if (!userId) {
+        console.error('User ID not found');
+        setLoading(false);
+        return;
+      }
+
+      const profileData = await UserService.getUserProfile(userId);
+      
+      if (profileData) {
+        setProfile({
+          name: profileData.fullName || currentUser.fullName || currentUser.name || '',
+          bio: profileData.bio || '',
+          legalExpertise: profileData.legalExpertise || [],
+          id: profileData.id,
+          first_name: profileData.fullName?.split(' ').slice(0, -1).join(' ') || '',
+          last_name: profileData.fullName?.split(' ').slice(-1)[0] || '',
+          followers: 0, // Backend không có field này
+          reputation: 0, // Backend không có field này
+          lawyerRequestStatus: null,
+          postCount: profileData.postCount || 0,
+          replyCount: profileData.replyCount || 0,
+          avatar: profileData.avatar || currentUser.avatar || null,
+          email: profileData.email || currentUser.email || '',
+          phoneNumber: profileData.phoneNumber || '',
+          joinedAt: profileData.joinedAt ? new Date(profileData.joinedAt) : null,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi tải thông tin',
+        text2: 'Không thể tải thông tin người dùng. Vui lòng thử lại.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const updateProfile = (field, value) => {
     try {
@@ -226,6 +287,15 @@ const ProfileSection = () => {
     return null;
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.BLUE} />
+        <Text style={{ marginTop: 16, color: COLORS.GRAY }}>Đang tải thông tin...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.card}>
@@ -246,14 +316,24 @@ const ProfileSection = () => {
                 </Text>
               </Text>
               <Text style={styles.infoText}>
-                <Text style={styles.labelText}>Lượt theo dõi: </Text>
-                <Text style={styles.valueText}>{profile.followers}</Text>
+                <Text style={styles.labelText}>Bài viết: </Text>
+                <Text style={styles.valueText}>{profile.postCount || 0}</Text>
               </Text>
               <Text style={styles.infoText}>
-                <Text style={styles.labelText}>Uy tín: </Text>
-                <Text style={styles.valueText}>{profile.reputation} </Text>
-                <Ionicons name="star-outline" size={16} color={COLORS.GREEN} />
+                <Text style={styles.labelText}>Câu trả lời: </Text>
+                <Text style={styles.valueText}>{profile.replyCount || 0}</Text>
               </Text>
+              {profile.joinedAt && (
+                <Text style={styles.infoText}>
+                  <Text style={styles.labelText}>Tham gia: </Text>
+                  <Text style={styles.valueText}>
+                    {new Date(profile.joinedAt).toLocaleDateString('vi-VN', {
+                      year: 'numeric',
+                      month: 'long'
+                    })}
+                  </Text>
+                </Text>
+              )}
             </View>
           </View>
         </View>
