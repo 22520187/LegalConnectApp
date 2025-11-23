@@ -1,97 +1,125 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '../../context/AuthContext';
+import UserService from '../../services/UserService';
 import COLORS from '../../constant/colors';
 import SCREENS from '../index';
 import QuestionList from '../../components/QuestionList/QuestionList';
 import FloatingActionButton from '../../components/FloatingActionButton/FloatingActionButton';
 
+
+const stripHtml = (html = '') => html.replace(/<[^>]*>/g, '').trim();
+const createSummary = (content = '', maxLength = 150) => {
+    const text = stripHtml(content);
+    return text.length <= maxLength ? text : `${text.substring(0, maxLength)}...`;
+};
+
+const mapUserPostToQuestion = (post, author) => ({
+    id: post.id,
+    title: post.title || '',
+    summary: createSummary(post.content || ''),
+    voteCount: post.views || 0,
+    answerCount: post.replyCount || 0,
+    viewCount: post.views || 0,
+    tags: post.categoryName ? [post.categoryName] : [],
+    author: {
+        id: author?.id ?? null,
+        name: author?.fullName || 'Bạn',
+        avatar: author?.avatar || null,
+    },
+    createdAt: post.createdAt ? new Date(post.createdAt) : new Date(),
+    hasAcceptedAnswer: post.solved ?? false,
+});
+
 const MyPosts = ({ navigation }) => {
     const [activeTab, setActiveTab] = useState('myPosts');
+    const [myPosts, setMyPosts] = useState([]);
+    const [bookmarkedPosts] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const { user } = useAuth();
 
-    // Mock data for posts - in real app, this would come from API
-    const myPosts = [
-        {
-            id: 1,
-            title: "Hợp đồng thuê nhà có hiệu lực bao lâu?",
-            summary: "Tôi vừa ký hợp đồng thuê nhà với chủ nhà, nhưng không rõ thời hạn hiệu lực...",
-            tags: ["hợp đồng", "thuê nhà", "luật dân sự"],
-            voteCount: 5,
-            answerCount: 3,
-            viewCount: 120,
-            hasAcceptedAnswer: true,
-            author: { name: "Bạn" },
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
-        },
-        {
-            id: 2,
-            title: "Quy định về chấm dứt hợp đồng lao động",
-            summary: "Công ty tôi muốn chấm dứt hợp đồng lao động với tôi mà không có lý do chính đáng...",
-            tags: ["lao động", "hợp đồng", "chấm dứt"],
-            voteCount: 8,
-            answerCount: 0,
-            viewCount: 85,
-            hasAcceptedAnswer: false,
-            author: { name: "Bạn" },
-            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) // 5 days ago
+    const loadMyPosts = useCallback(async ({ pageIndex = 0, append = false } = {}) => {
+        if (!user?.id) {
+            return Promise.resolve();
         }
-    ];
 
-    const bookmarkedPosts = [
-        {
-            id: 3,
-            title: "Thủ tục ly hôn đơn phương cần những gì?",
-            summary: "Tôi muốn ly hôn đơn phương nhưng chưa biết cần chuẩn bị những giấy tờ gì...",
-            tags: ["ly hôn", "hôn nhân", "thủ tục"],
-            voteCount: 12,
-            answerCount: 7,
-            viewCount: 245,
-            hasAcceptedAnswer: true,
-            author: { name: "Luật sư Minh" },
-            createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // 3 days ago
-        },
-        {
-            id: 4,
-            title: "Quyền lợi của người lao động khi nghỉ việc",
-            summary: "Khi nghỉ việc, tôi có được hưởng những quyền lợi gì từ công ty...",
-            tags: ["lao động", "nghỉ việc", "quyền lợi"],
-            voteCount: 6,
-            answerCount: 4,
-            viewCount: 156,
-            hasAcceptedAnswer: false,
-            author: { name: "Chuyên gia HR" },
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) // 1 day ago
+        try {
+            const response = await UserService.getUserPosts(user.id, {
+                page: pageIndex,
+                size: 10,
+                sort: 'createdAt,desc',
+            });
+
+            const content = response?.content ?? [];
+            const mapped = content.map(post => mapUserPostToQuestion(post, user));
+
+            setMyPosts(prev => (append ? [...prev, ...mapped] : mapped));
+
+            const totalPages = response?.totalPages ?? 0;
+            setHasMore(pageIndex < totalPages - 1);
+            setPage(pageIndex + 1);
+        } catch (error) {
+            Toast.show({
+                type: 'error',
+                text1: 'Không thể tải bài viết của bạn',
+                text2: error.message || 'Vui lòng thử lại sau',
+            });
+            throw error;
         }
-    ];
+    }, [user]);
 
-    const handleAskQuestion = () => {
-        navigation.navigate(SCREENS.ASKQUESTION);
-    };
+    useEffect(() => {
+        if (activeTab === 'myPosts') {
+            setLoading(true);
+            loadMyPosts({ pageIndex: 0, append: false })
+                .catch(() => null)
+                .finally(() => setLoading(false));
+        }
+    }, [activeTab, user?.id, loadMyPosts]);
 
-    const handleQuestionPress = (question) => {
-        // Navigate to question detail
+    const handleAskQuestion = () => navigation.navigate(SCREENS.ASKQUESTION);
+    const handleQuestionPress = question =>
         navigation.navigate(SCREENS.QUESTIONDETAIL, { question });
-    };
 
     const handleRefresh = () => {
+        if (activeTab !== 'myPosts') return;
         setRefreshing(true);
-        // Simulate API call
-        setTimeout(() => {
-            setRefreshing(false);
-        }, 1500);
+        loadMyPosts({ pageIndex: 0, append: false })
+            .catch(() => null)
+            .finally(() => setRefreshing(false));
     };
 
-    const getCurrentData = () => {
-        return activeTab === 'myPosts' ? myPosts : bookmarkedPosts;
+    const handleLoadMore = () => {
+        if (activeTab === 'myPosts' && !loading && hasMore) {
+            setLoading(true);
+            loadMyPosts({ pageIndex: page, append: true })
+                .catch(() => null)
+                .finally(() => setLoading(false));
+        }
     };
 
-    const getEmptyMessage = () => {
-        return activeTab === 'myPosts' 
-            ? { icon: '📝', title: 'Chưa có bài viết', text: 'Hãy đặt câu hỏi pháp lý đầu tiên của bạn!' }
-            : { icon: '🔖', title: 'Chưa có bookmark', text: 'Bookmark những bài viết hữu ích để đọc lại sau!' };
-    };
+
+    const getCurrentData = () =>
+        activeTab === 'myPosts' ? myPosts : bookmarkedPosts;
+
+    const getEmptyMessage = () =>
+        activeTab === 'myPosts'
+            ? {
+                icon: '📝',
+                title: 'Chưa có bài viết',
+                text: 'Hãy đặt câu hỏi pháp lý đầu tiên của bạn!',
+            }
+            : {
+                icon: '🔖',
+                title: 'Chưa có bookmark',
+                text: 'Bookmark những bài viết hữu ích để đọc lại sau!',
+            };
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -102,34 +130,34 @@ const MyPosts = ({ navigation }) => {
 
             {/* Tabs */}
             <View style={styles.tabsContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.tab, activeTab === 'myPosts' && styles.activeTab]}
                     onPress={() => setActiveTab('myPosts')}
                 >
-                    <Ionicons 
-                        name="document-text-outline" 
-                        size={20} 
-                        color={activeTab === 'myPosts' ? COLORS.WHITE : COLORS.GRAY_DARK} 
+                    <Ionicons
+                        name="document-text-outline"
+                        size={20}
+                        color={activeTab === 'myPosts' ? COLORS.WHITE : COLORS.GRAY_DARK}
                     />
                     <Text style={[
-                        styles.tabText, 
+                        styles.tabText,
                         activeTab === 'myPosts' && styles.activeTabText
                     ]}>
                         Bài viết của tôi
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.tab, activeTab === 'bookmarked' && styles.activeTab]}
                     onPress={() => setActiveTab('bookmarked')}
                 >
-                    <Ionicons 
-                        name="bookmark-outline" 
-                        size={20} 
-                        color={activeTab === 'bookmarked' ? COLORS.WHITE : COLORS.GRAY_DARK} 
+                    <Ionicons
+                        name="bookmark-outline"
+                        size={20}
+                        color={activeTab === 'bookmarked' ? COLORS.WHITE : COLORS.GRAY_DARK}
                     />
                     <Text style={[
-                        styles.tabText, 
+                        styles.tabText,
                         activeTab === 'bookmarked' && styles.activeTabText
                     ]}>
                         Đã bookmark
@@ -139,11 +167,13 @@ const MyPosts = ({ navigation }) => {
 
             {/* Content */}
             <View style={styles.content}>
-                <QuestionList
+            <QuestionList
                     questions={getCurrentData()}
                     onQuestionPress={handleQuestionPress}
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
+                    onLoadMore={activeTab === 'myPosts' ? handleLoadMore : undefined}
+                    loading={activeTab === 'myPosts' ? loading : false}
                     emptyState={getEmptyMessage()}
                 />
             </View>

@@ -23,7 +23,6 @@ public class Post {
     @Column(nullable = false)
     private String title;
     
-    @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
     
@@ -43,6 +42,12 @@ public class Post {
     @Column(name = "reply_count", columnDefinition = "INTEGER DEFAULT 0")
     private Integer replyCount = 0;
     
+    @Column(name = "upvote_count", columnDefinition = "INTEGER DEFAULT 0")
+    private Integer upvoteCount = 0;
+    
+    @Column(name = "downvote_count", columnDefinition = "INTEGER DEFAULT 0")
+    private Integer downvoteCount = 0;
+    
     @Column(name = "is_pinned")
     private Boolean pinned = false;
     
@@ -55,15 +60,16 @@ public class Post {
     @Column(name = "is_active")
     private Boolean isActive = true;
     
-    @Column(name = "is_reported")
-    private Boolean isReported = false;
-    
+    // Report management fields
     @Column(name = "report_count", columnDefinition = "INTEGER DEFAULT 0")
     private Integer reportCount = 0;
     
+    @Column(name = "is_reported")
+    private Boolean isReported = false;
+    
     @Column(name = "violation_reason")
     private String violationReason;
-    
+
     // Tags stored as comma-separated string for simplicity
     @Column(name = "tags")
     private String tags;
@@ -80,6 +86,10 @@ public class Post {
     // Relationship with PostReply
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PostReply> replies;
+    
+    // Relationship with PostVote
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<PostVote> votes;
     
     @PrePersist
     protected void onCreate() {
@@ -119,9 +129,19 @@ public class Post {
         this.lastReplyAt = LocalDateTime.now();
     }
     
-    // Helper method to add report
+    // Helper methods for report management
     public void addReport() {
         this.reportCount = (this.reportCount != null ? this.reportCount : 0) + 1;
         this.isReported = true;
+    }
+    
+    public void clearReports() {
+        this.reportCount = 0;
+        this.isReported = false;
+        this.violationReason = null;
+    }
+    
+    public boolean hasReports() {
+        return this.reportCount != null && this.reportCount > 0;
     }
 }

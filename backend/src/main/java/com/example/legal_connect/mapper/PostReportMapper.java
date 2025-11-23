@@ -35,9 +35,9 @@ public class PostReportMapper {
         
         UserBasicDto dto = new UserBasicDto();
         dto.setId(user.getId());
+        dto.setName(user.getFullName());
         dto.setEmail(user.getEmail());
-        dto.setFullName(user.getFullName());
-        dto.setAvatarUrl(user.getAvatar());
+        dto.setAvatar(user.getAvatar());
         dto.setRole(user.getRole() != null ? user.getRole().name() : null);
         return dto;
     }

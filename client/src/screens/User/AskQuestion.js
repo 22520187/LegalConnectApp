@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import ForumService from '../../services/ForumService';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +24,10 @@ const AskQuestion = ({ navigation }) => {
     const [tags, setTags] = useState([]);
     const [currentTag, setCurrentTag] = useState('');
     const [isPreviewMode, setIsPreviewMode] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+    const [loadingCategories, setLoadingCategories] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     // Suggestions data
     const similarQuestions = [
@@ -50,7 +55,27 @@ const AskQuestion = ({ navigation }) => {
         setTags(tags.filter(tag => tag !== tagToRemove));
     };
 
-    const handleSubmit = () => {
+    useEffect(() => {
+        const fetchCategories = async () => {
+            setLoadingCategories(true);
+            try {
+                const data = await ForumService.getCategories();
+                if (Array.isArray(data) && data.length > 0) {
+                    setCategories(data);
+                    setSelectedCategoryId(data[0].id);
+                }
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+                Alert.alert('Lỗi', 'Không thể tải danh mục bài viết. Vui lòng thử lại sau.');
+            } finally {
+                setLoadingCategories(false);
+            }
+        };
+
+        fetchCategories();
+    }, []);
+
+    const handleSubmit = async () => {
         if (!title.trim()) {
             Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề câu hỏi');
             return;
@@ -59,11 +84,51 @@ const AskQuestion = ({ navigation }) => {
             Alert.alert('Lỗi', 'Vui lòng nhập mô tả câu hỏi');
             return;
         }
+        if (!selectedCategoryId) {
+            Alert.alert('Lỗi', 'Vui lòng chọn danh mục cho câu hỏi');
+            return;
+        }
 
-        // TODO: Implement API call to submit question
-        Alert.alert('Thành công', 'Câu hỏi của bạn đã được đăng!', [
-            { text: 'OK', onPress: () => navigation.goBack() }
-        ]);
+        const payload = {
+            title: title.trim(),
+            content: description.trim(),
+            categoryId: selectedCategoryId,
+            tags: tags.slice(0, 5),
+        };
+
+        try {
+            setSubmitting(true);
+            const response = await ForumService.createPost(payload);
+
+            Alert.alert('Thành công', 'Câu hỏi của bạn đã được đăng!', [
+                {
+                    text: 'Xem chi tiết',
+                    onPress: () => {
+                        if (response?.id) {
+                            navigation.replace('QuestionDetail', { postId: response.id });
+                        } else {
+                            navigation.goBack();
+                        }
+                    },
+                },
+                { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
+
+            setTitle('');
+            setDescription('');
+            setTags([]);
+            setIsPreviewMode(false);
+        } catch (error) {
+            console.error('Error creating post:', error);
+            const message =
+                error?.response?.data?.message ||
+                error?.message ||
+                'Không thể đăng câu hỏi. Vui lòng thử lại.';
+            Alert.alert('Lỗi', message);
+        } finally {
+            setSubmitting(false);
+        }
+
     };
 
     const renderPreview = () => (
@@ -140,6 +205,45 @@ const AskQuestion = ({ navigation }) => {
                     ))}
                 </View>
             </View>
+            {/* Category Selector */}
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Danh mục <Text style={styles.required}>*</Text></Text>
+                {loadingCategories ? (
+                    <Text style={styles.loadingText}>Đang tải danh mục...</Text>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.categoryList}
+                    >
+                        {categories.map((category) => {
+                            const isSelected = category.id === selectedCategoryId;
+                            return (
+                                <TouchableOpacity
+                                    key={category.id}
+                                    style={[
+                                        styles.categoryChip,
+                                        isSelected && styles.categoryChipSelected,
+                                    ]}
+                                    onPress={() => setSelectedCategoryId(category.id)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.categoryChipText,
+                                            isSelected && styles.categoryChipTextSelected,
+                                        ]}
+                                    >
+                                        {category.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                )}
+                {!loadingCategories && categories.length === 0 && (
+                    <Text style={styles.loadingText}>Không có danh mục nào khả dụng</Text>
+                )}
+            </View>
         </View>
     );
 
@@ -207,12 +311,14 @@ const AskQuestion = ({ navigation }) => {
                 <TouchableOpacity 
                     style={[
                         styles.submitButton,
-                        (!title.trim() || !description.trim()) && styles.submitButtonDisabled
-                    ]} 
+                        (!title.trim() || !description.trim() || !selectedCategoryId || submitting) && styles.submitButtonDisabled
+                    ]}
                     onPress={handleSubmit}
-                    disabled={!title.trim() || !description.trim()}
+                    disabled={!title.trim() || !description.trim() || !selectedCategoryId || submitting}
                 >
-                    <Text style={styles.submitButtonText}>Đăng câu hỏi</Text>
+                    <Text style={styles.submitButtonText}>
+                        {submitting ? 'Đang đăng...' : 'Đăng câu hỏi'}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>
@@ -438,6 +544,35 @@ const styles = StyleSheet.create({
         color: COLORS.WHITE,
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    loadingText: {
+        fontSize: 14,
+        color: COLORS.GRAY,
+        marginTop: 8,
+    },
+    categoryList: {
+        paddingVertical: 8,
+    },
+    categoryChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: COLORS.GRAY_BG,
+        marginRight: 10,
+        backgroundColor: COLORS.WHITE,
+    },
+    categoryChipSelected: {
+        backgroundColor: COLORS.BLUE,
+        borderColor: COLORS.BLUE,
+    },
+    categoryChipText: {
+        color: COLORS.GRAY_DARK,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    categoryChipTextSelected: {
+        color: COLORS.WHITE,
     },
 });
 

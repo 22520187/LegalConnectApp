@@ -31,6 +31,26 @@ export const getAllPosts = async (page = 0, size = 10, categoryId = null, timeFi
 };
 
 /**
+ * Get all post categories
+ * @returns {Promise<Array>} List of categories
+ */
+export const getCategories = async () => {
+    try {
+        const response = await apiClient.get('/forum/categories');
+
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return [];
+        }
+    } catch (error) {
+        console.error('Error fetching categories:', error);
+        throw error;
+    }
+};
+
+/**
  * Get posts with advanced options (sort, filter, etc.)
  * @param {Object} options - Query options
  * @param {number} options.page - Page number
@@ -231,6 +251,7 @@ const ForumService = {
     votePost,
     getReplies,
     createReply,
+    getCategories,
 };
 
 export default ForumService;
