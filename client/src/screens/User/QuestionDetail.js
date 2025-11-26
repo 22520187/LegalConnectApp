@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,107 +15,82 @@ import COLORS from '../../constant/colors';
 import CommentInput from '../../components/CommentInput/CommentInput';
 import CommentItem from '../../components/CommentItem/CommentItem';
 import ReportModal from '../../components/ReportModal/ReportModal';
+import ForumService from '../../services/ForumService';
+import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 const QuestionDetail = ({ route, navigation }) => {
   const { question } = route.params;
+  const { user } = useAuth();
+  const postId = question.id || question.postId; // Get postId from question
   const [userVote, setUserVote] = useState(null); // 'upvote', 'downvote', or null
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [voteCount, setVoteCount] = useState(question.voteCount);
   const [expandedComments, setExpandedComments] = useState({});
   const [showCommentInput, setShowCommentInput] = useState({});
   const [replyTo, setReplyTo] = useState(null);
+  const [replyToId, setReplyToId] = useState(null); // Store reply ID for nested replies
   const [answersData, setAnswersData] = useState([]);
   const [editingComment, setEditingComment] = useState(null);
   const [showAddAnswer, setShowAddAnswer] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-  const currentUserId = 'current_user_id'; // In real app, get from auth context
+  const [loadingReplies, setLoadingReplies] = useState(true);
+  const currentUserId = user?.id || user?.userId;
 
-  // Initialize answers data
+  // Load replies from API
   useEffect(() => {
-    setAnswersData([
-    {
-      id: 1,
-      content: 'Để khởi nghiệp tại Việt Nam, bạn cần thực hiện các bước sau:\n\n1. **Đăng ký kinh doanh**: Nộp hồ sơ tại Sở Kế hoạch và Đầu tư hoặc trực tuyến qua cổng dịch vụ công quốc gia.\n\n2. **Giấy tờ cần thiết**:\n   - Giấy chứng minh nhân dân/Căn cước công dân\n   - Tờ khai đăng ký doanh nghiệp\n   - Bản sao công chứng hợp đồng thuê văn phòng\n\n3. **Vốn pháp định**: Tối thiểu 15 tỷ đồng cho công ty cổ phần, không quy định tối thiểu cho công ty TNHH.\n\n4. **Thủ tục thuế**: Đăng ký mã số thuế, khai báo thuế hàng tháng/quý.\n\nThời gian xử lý thường là 15-20 ngày làm việc.',
-      author: {
-        id: 1,
-        name: 'Luật sư Nguyễn Văn A',
-        avatar: null,
-        title: 'Chuyên gia luật doanh nghiệp',
-        reputation: 1250,
-      },
-      voteCount: 24,
-      userVote: null,
-      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-      isAccepted: true,
-      comments: [
-        {
-          id: 1,
-          author: 'Mai Thu',
-          authorId: 'user_1',
-          content: 'Cảm ơn bạn, thông tin rất hữu ích! Tôi đang cần thông tin này để chuẩn bị cho việc khởi nghiệp.',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        },
-        {
-          id: 2,
-          author: 'Phạm Minh',
-          authorId: 'user_2',
-          content: 'Có cần giấy phép kinh doanh riêng không? Và thời gian xử lý thủ tục thường là bao lâu?',
-          createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-        },
-        {
-          id: 3,
-          author: 'Bạn',
-          authorId: 'current_user_id',
-          content: 'Trả lời @Phạm Minh: Thời gian thường là 15-20 ngày làm việc như luật sư đã nói.',
-          createdAt: new Date(Date.now() - 30 * 60 * 1000),
-          replyTo: 'Phạm Minh'
-        }
-      ]
-    },
-    {
-      id: 2,
-      content: 'Bổ sung thêm một số lưu ý quan trọng:\n\n- **Chọn loại hình doanh nghiệp**: Công ty TNHH phù hợp với startup nhỏ, công ty cổ phần cho dự án lớn có nhiều nhà đầu tư.\n\n- **Địa chỉ đăng ký**: Phải có địa chỉ cụ thể, có thể thuê chỗ làm việc chung (co-working space).\n\n- **Ngành nghề kinh doanh**: Khai báo đầy đủ các ngành nghề dự kiến, tránh phải sửa đổi sau này.\n\n- **Chi phí**: Khoảng 1-3 triệu đồng cho toàn bộ thủ tục.',
-      author: {
-        id: 2,
-        name: 'Trần Thị B',
-        avatar: null,
-        title: 'Kế toán trưởng',
-        reputation: 890,
-      },
-      voteCount: 12,
-      userVote: null,
-      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
-      isAccepted: false,
-      comments: [
-        {
-          id: 4,
-          author: 'Hoàng Nam',
-          authorId: 'user_3',
-          content: 'Tôi đã làm theo hướng dẫn này và rất thành công. Nhớ chuẩn bị đầy đủ giấy tờ trước khi nộp hồ sơ.',
-          createdAt: new Date(Date.now() - 30 * 60 * 1000),
-        }
-      ]
-    },
-    {
-      id: 3,
-      content: 'Theo kinh nghiệm của tôi, nên tìm hiểu thêm về:\n\n1. **Ưu đãi cho startup**: Chính phủ có nhiều chương trình hỗ trợ startup công nghệ.\n\n2. **Bảo hiểm xã hội**: Bắt buộc cho nhân viên, tự nguyện cho chủ doanh nghiệp.\n\n3. **Hóa đơn điện tử**: Bắt buộc từ 2022, cần đăng ký sớm.\n\nNếu cần hỗ trợ cụ thể, có thể liên hệ trực tiếp.',
-      author: {
-        id: 3,
-        name: 'Lê Văn C',
-        avatar: null,
-        title: 'Doanh nhân',
-        reputation: 650,
-      },
-      voteCount: 8,
-      userVote: null,
-      createdAt: new Date(Date.now() - 30 * 60 * 1000),
-      isAccepted: false,
-      comments: []
+    if (postId) {
+      loadReplies();
     }
-    ]);
+  }, [postId]);
+
+  const loadReplies = async () => {
+    try {
+      setLoadingReplies(true);
+      const replies = await ForumService.getReplies(postId);
+      
+      // Map API response to component format
+      const mappedReplies = replies.map(reply => ({
+        id: reply.id,
+        content: reply.content,
+        author: {
+          id: reply.author?.id,
+          name: reply.author?.name || 'Người dùng',
+          avatar: reply.author?.avatar,
+          title: reply.author?.role || '',
+          reputation: 0, // Backend doesn't provide this
+        },
+        voteCount: (reply.upvoteCount || 0) - (reply.downvoteCount || 0),
+        userVote: reply.userVote, // 'UPVOTE', 'DOWNVOTE', or null
+        createdAt: new Date(reply.createdAt),
+        isAccepted: reply.isSolution || false,
+        comments: reply.children ? reply.children.map(child => ({
+          id: child.id,
+          author: child.author?.name || 'Người dùng',
+          authorId: child.author?.id,
+          content: child.content,
+          createdAt: new Date(child.createdAt),
+          replyTo: null, // Can be enhanced later
+        })) : [],
+      }));
+      
+      setAnswersData(mappedReplies);
+    } catch (error) {
+      console.error('Error loading replies:', error);
+      Alert.alert('Lỗi', 'Không thể tải bình luận. Vui lòng thử lại.');
+      setAnswersData([]);
+    } finally {
+      setLoadingReplies(false);
+    }
+  };
+
+  // Initialize answers data (fallback to empty if API fails)
+  useEffect(() => {
+    if (answersData.length === 0 && !loadingReplies) {
+      // Keep empty array, API will populate it
+    }
   }, []);
 
   // Mock related questions
@@ -240,72 +216,79 @@ const QuestionDetail = ({ route, navigation }) => {
     setReplyTo(null);
   };
 
-  const handleReplyToComment = (answerId, commentAuthor) => {
+  const handleReplyToComment = (answerId, commentAuthor, commentId = null) => {
     setShowCommentInput(prev => ({
       ...prev,
       [answerId]: true
     }));
     setReplyTo(commentAuthor);
+    setReplyToId(commentId); // Store comment/reply ID for nested reply
   };
 
   const handleSubmitComment = async (answerId, commentText) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (editingComment) {
-      // Edit existing comment
-      setAnswersData(prev => 
-        prev.map(answer => 
-          answer.id === answerId
-            ? {
-                ...answer,
-                comments: answer.comments.map(comment => 
-                  comment.id === editingComment.id
-                    ? { ...comment, content: commentText, isEdited: true }
-                    : comment
-                )
-              }
-            : answer
-        )
-      );
-      setEditingComment(null);
-      Alert.alert('Thành công', 'Đã cập nhật bình luận!');
-    } else {
-      // Add new comment
-      const newComment = {
-        id: Date.now(),
-        author: 'Bạn', // Current user name
-        authorId: currentUserId,
-        content: commentText,
-        createdAt: new Date(),
-        replyTo: replyTo
-      };
-
-      setAnswersData(prev => 
-        prev.map(answer => 
-          answer.id === answerId
-            ? {
-                ...answer,
-                comments: [...answer.comments, newComment]
-              }
-            : answer
-        )
-      );
-      Alert.alert('Thành công', 'Đã thêm bình luận của bạn!');
+    if (!postId) {
+      Alert.alert('Lỗi', 'Không tìm thấy bài viết');
+      return;
     }
 
-    // Close comment input
-    setShowCommentInput(prev => ({
-      ...prev,
-      [answerId]: false
-    }));
-    setReplyTo(null);
+    if (editingComment) {
+      // Edit existing comment - Not supported by API yet
+      Alert.alert('Thông báo', 'Chức năng chỉnh sửa bình luận chưa được hỗ trợ');
+      setEditingComment(null);
+      return;
+    }
 
-    // Expand comments to show the new one
-    setExpandedComments(prev => ({
-      ...prev,
-      [answerId]: true
-    }));
+    try {
+      // Prepare reply data
+      const replyData = {
+        content: commentText.trim(),
+      };
+
+      // If replying to a comment, set parentId
+      if (replyToId) {
+        replyData.parentId = replyToId;
+      }
+
+      // Call API to create reply
+      const newReply = await ForumService.createReply(postId, replyData);
+
+      // Reload replies to get updated list
+      await loadReplies();
+
+      Alert.alert('Thành công', 'Đã thêm bình luận của bạn!');
+
+      // Close comment input
+      setShowCommentInput(prev => ({
+        ...prev,
+        [answerId]: false
+      }));
+      setReplyTo(null);
+      setReplyToId(null);
+
+      // Expand comments to show the new one
+      setExpandedComments(prev => ({
+        ...prev,
+        [answerId]: true
+      }));
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      let message = 'Không thể gửi bình luận. Vui lòng thử lại.';
+      
+      // Extract error message
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.data && typeof errorData.data === 'object') {
+          const validationErrors = Object.values(errorData.data);
+          message = validationErrors.join('\n') || errorData.message || message;
+        } else if (errorData.message) {
+          message = errorData.message;
+        }
+      } else if (error?.message) {
+        message = error.message;
+      }
+      
+      Alert.alert('Lỗi', message);
+    }
   };
 
   const handleCancelComment = (answerId) => {
@@ -314,6 +297,7 @@ const QuestionDetail = ({ route, navigation }) => {
       [answerId]: false
     }));
     setReplyTo(null);
+    setReplyToId(null);
     setEditingComment(null);
   };
 
@@ -344,29 +328,43 @@ const QuestionDetail = ({ route, navigation }) => {
   };
 
   const handleSubmitAnswer = async (answerText) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const newAnswer = {
-      id: Date.now(),
-      content: answerText,
-      author: {
-        id: currentUserId,
-        name: 'Bạn',
-        avatar: null,
-        title: 'Thành viên',
-        reputation: 0,
-      },
-      voteCount: 0,
-      userVote: null,
-      createdAt: new Date(),
-      isAccepted: false,
-      comments: []
-    };
+    if (!postId) {
+      Alert.alert('Lỗi', 'Không tìm thấy bài viết');
+      return;
+    }
 
-    setAnswersData(prev => [...prev, newAnswer]);
-    setShowAddAnswer(false);
-    Alert.alert('Thành công', 'Đã thêm câu trả lời của bạn!');
+    try {
+      // Call API to create top-level reply (no parentId)
+      const replyData = {
+        content: answerText.trim(),
+      };
+
+      await ForumService.createReply(postId, replyData);
+
+      // Reload replies to get updated list
+      await loadReplies();
+
+      setShowAddAnswer(false);
+      Alert.alert('Thành công', 'Câu trả lời của bạn đã được đăng!');
+    } catch (error) {
+      console.error('Error submitting answer:', error);
+      let message = 'Không thể đăng câu trả lời. Vui lòng thử lại.';
+      
+      // Extract error message
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.data && typeof errorData.data === 'object') {
+          const validationErrors = Object.values(errorData.data);
+          message = validationErrors.join('\n') || errorData.message || message;
+        } else if (errorData.message) {
+          message = errorData.message;
+        }
+      } else if (error?.message) {
+        message = error.message;
+      }
+      
+      Alert.alert('Lỗi', message);
+    }
   };
 
   const handleCancelAnswer = () => {
@@ -658,7 +656,18 @@ const QuestionDetail = ({ route, navigation }) => {
             </View>
           )}
           
-          {answersData.map(renderAnswer)}
+          {loadingReplies ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.BLUE} />
+              <Text style={styles.loadingText}>Đang tải bình luận...</Text>
+            </View>
+          ) : answersData.length > 0 ? (
+            answersData.map(renderAnswer)
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Chưa có bình luận nào. Hãy là người đầu tiên trả lời!</Text>
+            </View>
+          )}
         </View>
 
         {/* Related Questions */}
@@ -1121,6 +1130,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.GRAY_DARK,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.GRAY,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.GRAY,
+    textAlign: 'center',
   },
 });
 

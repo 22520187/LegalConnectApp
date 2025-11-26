@@ -125,8 +125,30 @@ export const createPost = async (postData) => {
         if (response.status >= 200 && response.status < 300) {
             return response.data;
         } else {
-            console.error('API returned non-success status:', response.status);
-            return null;
+            // Throw error for non-success status codes
+            const error = new Error('Failed to create post');
+            error.response = response;
+            error.status = response.status;
+            // Extract validation error message if available
+            if (response.data) {
+                // Handle ApiResponse format from GlobalExceptionHandler
+                if (response.data.data && typeof response.data.data === 'object') {
+                    // Extract validation errors from data object
+                    const validationErrors = Object.values(response.data.data).join(', ');
+                    error.message = validationErrors || response.data.message || 'Validation failed';
+                } else if (response.data.message) {
+                    error.message = response.data.message;
+                } else if (response.data.errors && Array.isArray(response.data.errors)) {
+                    // Handle validation errors from Spring Boot (alternative format)
+                    const errorMessages = response.data.errors.map(err => err.defaultMessage || err.message).join(', ');
+                    error.message = errorMessages || 'Validation failed';
+                } else if (response.data.validationErrors) {
+                    // Handle PostExceptionHandler format
+                    const validationErrors = Object.values(response.data.validationErrors).join(', ');
+                    error.message = validationErrors || 'Validation failed';
+                }
+            }
+            throw error;
         }
     } catch (error) {
         console.error('Error creating post:', error);
@@ -196,20 +218,18 @@ export const votePost = async (postId, voteType) => {
 /**
  * Get replies for a post
  * @param {number} postId - Post ID
- * @param {number} page - Page number
- * @param {number} size - Page size
- * @returns {Promise<Object>} Page object with replies
+ * @returns {Promise<Array>} List of replies
  */
-export const getReplies = async (postId, page = 0, size = 10) => {
+export const getReplies = async (postId) => {
     try {
-        const params = { page, size };
-        const response = await apiClient.get(`/forum/posts/${postId}/replies`, { params });
+        const response = await apiClient.get(`/forum/posts/${postId}/replies`);
         
         if (response.status >= 200 && response.status < 300) {
-            return response.data;
+            // Backend returns List<PostReplyDto>, not Page
+            return Array.isArray(response.data) ? response.data : [];
         } else {
             console.error('API returned non-success status:', response.status);
-            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+            return [];
         }
     } catch (error) {
         console.error('Error fetching replies:', error);
@@ -221,7 +241,8 @@ export const getReplies = async (postId, page = 0, size = 10) => {
  * Create a reply to a post
  * @param {number} postId - Post ID
  * @param {Object} replyData - Reply data
- * @param {string} replyData.content - Reply content
+ * @param {string} replyData.content - Reply content (required, min 10 chars)
+ * @param {number} replyData.parentId - Parent reply ID (optional, for nested replies)
  * @returns {Promise<Object>} Created reply
  */
 export const createReply = async (postId, replyData) => {
@@ -231,8 +252,30 @@ export const createReply = async (postId, replyData) => {
         if (response.status >= 200 && response.status < 300) {
             return response.data;
         } else {
-            console.error('API returned non-success status:', response.status);
-            return null;
+            // Throw error for non-success status codes
+            const error = new Error('Failed to create reply');
+            error.response = response;
+            error.status = response.status;
+            // Extract validation error message if available
+            if (response.data) {
+                // Handle ApiResponse format from GlobalExceptionHandler
+                if (response.data.data && typeof response.data.data === 'object') {
+                    // Extract validation errors from data object
+                    const validationErrors = Object.values(response.data.data).join(', ');
+                    error.message = validationErrors || response.data.message || 'Validation failed';
+                } else if (response.data.message) {
+                    error.message = response.data.message;
+                } else if (response.data.errors && Array.isArray(response.data.errors)) {
+                    // Handle validation errors from Spring Boot (alternative format)
+                    const errorMessages = response.data.errors.map(err => err.defaultMessage || err.message).join(', ');
+                    error.message = errorMessages || 'Validation failed';
+                } else if (response.data.validationErrors) {
+                    // Handle PostExceptionHandler format
+                    const validationErrors = Object.values(response.data.validationErrors).join(', ');
+                    error.message = validationErrors || 'Validation failed';
+                }
+            }
+            throw error;
         }
     } catch (error) {
         console.error('Error creating reply:', error);

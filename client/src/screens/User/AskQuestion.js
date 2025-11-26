@@ -100,15 +100,16 @@ const AskQuestion = ({ navigation }) => {
             setSubmitting(true);
             const response = await ForumService.createPost(payload);
 
+            // Check if response is valid before showing success
+            if (!response || !response.id) {
+                throw new Error('Không nhận được phản hồi từ server');
+            }
+
             Alert.alert('Thành công', 'Câu hỏi của bạn đã được đăng!', [
                 {
                     text: 'Xem chi tiết',
                     onPress: () => {
-                        if (response?.id) {
-                            navigation.replace('QuestionDetail', { postId: response.id });
-                        } else {
-                            navigation.goBack();
-                        }
+                        navigation.replace('QuestionDetail', { postId: response.id });
                     },
                 },
                 { text: 'OK', onPress: () => navigation.goBack() },
@@ -120,10 +121,31 @@ const AskQuestion = ({ navigation }) => {
             setIsPreviewMode(false);
         } catch (error) {
             console.error('Error creating post:', error);
-            const message =
-                error?.response?.data?.message ||
-                error?.message ||
-                'Không thể đăng câu hỏi. Vui lòng thử lại.';
+            let message = 'Không thể đăng câu hỏi. Vui lòng thử lại.';
+            
+            // Extract error message from various sources
+            if (error?.response?.data) {
+                const errorData = error.response.data;
+                // Handle ApiResponse format from GlobalExceptionHandler
+                if (errorData.data && typeof errorData.data === 'object') {
+                    // Extract validation errors from data object (Map<String, String>)
+                    const validationErrors = Object.values(errorData.data);
+                    message = validationErrors.join('\n') || errorData.message || message;
+                } else if (errorData.validationErrors && typeof errorData.validationErrors === 'object') {
+                    // Handle PostExceptionHandler format
+                    const validationErrors = Object.values(errorData.validationErrors);
+                    message = validationErrors.join('\n') || message;
+                } else if (errorData.errors && Array.isArray(errorData.errors)) {
+                    // Handle alternative Spring Boot validation errors format
+                    const errorMessages = errorData.errors.map(err => err.defaultMessage || err.message).join('\n');
+                    message = errorMessages || message;
+                } else if (errorData.message) {
+                    message = errorData.message;
+                }
+            } else if (error?.message) {
+                message = error.message;
+            }
+            
             Alert.alert('Lỗi', message);
         } finally {
             setSubmitting(false);
