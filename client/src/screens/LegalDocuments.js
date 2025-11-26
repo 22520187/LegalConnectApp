@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,167 +16,161 @@ import COLORS from '../constant/colors';
 import LegalDocumentFilter from '../components/LegalDocumentFilter/LegalDocumentFilter';
 import LegalDocumentCard from '../components/LegalDocumentCard/LegalDocumentCard';
 import SCREENS from './index';
+import { loadLegalDocumentDataset } from '../services/LegalDocumentDataset';
 
 const { width } = Dimensions.get('window');
+
+const BASE_LEGAL_FIELDS = [
+  {
+    id: 'all',
+    name: 'Tất cả',
+    icon: 'library-outline',
+    count: 0,
+    color: COLORS.BLUE,
+    description: 'Tất cả văn bản pháp luật',
+  },
+  {
+    id: 'administrative',
+    name: 'Bộ máy hành chính',
+    icon: 'business-outline',
+    count: 0,
+    color: COLORS.GREEN,
+    description: 'Văn bản về tổ chức bộ máy',
+  },
+  {
+    id: 'finance',
+    name: 'Tài chính nhà nước',
+    icon: 'card-outline',
+    count: 0,
+    color: COLORS.ORANGE,
+    description: 'Văn bản về tài chính công',
+  },
+  {
+    id: 'tax',
+    name: 'Thuế - Phí - Lệ phí',
+    icon: 'receipt-outline',
+    count: 0,
+    color: COLORS.PURPLE,
+    description: 'Văn bản về thuế và phí',
+  },
+  {
+    id: 'commerce',
+    name: 'Thương mại',
+    icon: 'storefront-outline',
+    count: 0,
+    color: COLORS.RAJAH,
+    description: 'Văn bản về hoạt động thương mại',
+  },
+  {
+    id: 'investment',
+    name: 'Đầu tư',
+    icon: 'trending-up-outline',
+    count: 0,
+    color: COLORS.RED,
+    description: 'Văn bản về đầu tư',
+  },
+  {
+    id: 'realestate',
+    name: 'Bất động sản',
+    icon: 'home-outline',
+    count: 0,
+    color: COLORS.GREEN,
+    description: 'Văn bản về bất động sản',
+  },
+  {
+    id: 'education',
+    name: 'Giáo dục',
+    icon: 'school-outline',
+    count: 0,
+    color: COLORS.BLUE,
+    description: 'Văn bản về giáo dục',
+  },
+  {
+    id: 'environment',
+    name: 'Tài nguyên Môi trường',
+    icon: 'leaf-outline',
+    count: 0,
+    color: COLORS.GREEN,
+    description: 'Văn bản về môi trường',
+  },
+];
 
 const LegalDocuments = () => {
   const navigation = useNavigation();
   const [activeFilter, setActiveFilter] = useState('newest');
   const [selectedField, setSelectedField] = useState('all');
+  const [legalDocuments, setLegalDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data cho các lĩnh vực pháp luật
-  const legalFields = [
-    {
-      id: 'all',
-      name: 'Tất cả',
-      icon: 'library-outline',
-      count: 50,
-      color: COLORS.BLUE,
-      description: 'Tất cả văn bản pháp luật'
-    },
-    {
-      id: 'administrative',
-      name: 'Bộ máy hành chính',
-      icon: 'business-outline',
-      count: 10,
-      color: COLORS.GREEN,
-      description: 'Văn bản về tổ chức bộ máy'
-    },
-    {
-      id: 'finance',
-      name: 'Tài chính nhà nước',
-      icon: 'card-outline',
-      count: 10,
-      color: COLORS.ORANGE,
-      description: 'Văn bản về tài chính công'
-    },
-    {
-      id: 'tax',
-      name: 'Thuế - Phí - Lệ phí',
-      icon: 'receipt-outline',
-      count: 9,
-      color: COLORS.PURPLE,
-      description: 'Văn bản về thuế và phí'
-    },
-    {
-      id: 'commerce',
-      name: 'Thương mại',
-      icon: 'storefront-outline',
-      count: 5,
-      color: COLORS.RAJAH,
-      description: 'Văn bản về hoạt động thương mại'
-    },
-    {
-      id: 'investment',
-      name: 'Đầu tư',
-      icon: 'trending-up-outline',
-      count: 3,
-      color: COLORS.RED,
-      description: 'Văn bản về đầu tư'
-    },
-    {
-      id: 'realestate',
-      name: 'Bất động sản',
-      icon: 'home-outline',
-      count: 3,
-      color: COLORS.GREEN,
-      description: 'Văn bản về bất động sản'
-    },
-    {
-      id: 'education',
-      name: 'Giáo dục',
-      icon: 'school-outline',
-      count: 2,
-      color: COLORS.BLUE,
-      description: 'Văn bản về giáo dục'
-    },
-    {
-      id: 'environment',
-      name: 'Tài nguyên Môi trường',
-      icon: 'leaf-outline',
-      count: 2,
-      color: COLORS.GREEN,
-      description: 'Văn bản về môi trường'
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const dataset = await loadLegalDocumentDataset();
+      setLegalDocuments(dataset);
+    } catch (err) {
+      console.error('Không thể tải dữ liệu văn bản:', err);
+      setError('Không thể tải dữ liệu văn bản. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, []);
 
-  // Mock data cho văn bản pháp luật
-  const legalDocuments = [
-    {
-      id: 1,
-      title: 'Nghị quyết 94/NQ-HDND năm 2017 Chương trình giám sát năm 2018 của Hội đồng nhân dân tỉnh Hà Giang khóa XVII, nhiệm kỳ...',
-      summary: 'NGHỊ QUYẾT BAN HÀNH CHƯƠNG TRÌNH GIÁM SÁT NĂM 2018 CỦA HỘI ĐỒNG NHÂN DÂN TỈNH HÀ GIANG KHÓA XVII, NHIỆM KỲ 2016 - 2021 HỘI ĐỒNG NHÂN DÂN TỈNH...',
-      type: 'Nghị quyết',
-      status: 'Đã biết',
-      code: '94/NQ-HDND',
-      province: 'Tỉnh Hà Giang',
-      issuer: 'Thảo Hồng Sơn',
-      date: '14/07/2017',
-      field: 'administrative',
-      tags: ['Nghị quyết', 'Hà Giang', 'Giám sát'],
-      author: {
-        id: 1,
-        name: 'Thảo Hồng Sơn',
-        avatar: null
-      },
-      voteCount: 5,
-      answerCount: 3,
-      viewCount: 120,
-      hasAcceptedAnswer: true,
-      createdAt: new Date('2017-07-14')
-    },
-    {
-      id: 2,
-      title: 'Quyết định 626/QĐ-UBND năm 2017 Kế hoạch thời gian năm học 2017-2018 đối với giáo dục mầm non, giáo dục phổ thông và giáo...',
-      summary: 'QUYẾT ĐỊNH BAN HÀNH KẾ HOẠCH THỜI GIAN NĂM HỌC 2017-2018 ĐỐI VỚI GIÁO DỤC MẦM NON, GIÁO DỤC PHỔ THÔNG VÀ GIÁO DỤC THƯỜNG XUYÊN TRÊN ĐỊA...',
-      type: 'Quyết định',
-      status: 'Đã biết',
-      code: '626/QĐ-UBND',
-      province: 'Tỉnh Điện Biên',
-      issuer: 'Lê Văn Quý',
-      date: '14/07/2017',
-      field: 'education',
-      tags: ['Quyết định', 'Giáo dục', 'Năm học'],
-      author: {
-        id: 2,
-        name: 'Lê Văn Quý',
-        avatar: null
-      },
-      voteCount: 8,
-      answerCount: 5,
-      viewCount: 200,
-      hasAcceptedAnswer: false,
-      createdAt: new Date('2017-07-14')
-    },
-    {
-      id: 3,
-      title: 'Nghị quyết 120/2017/NQ-HDND sửa đổi Khoản 3, Điều 1 Nghị quyết 23/2015/NQ-HDND quy định chính sách khuyến khích xã hội hoá...',
-      summary: 'NGHỊ QUYẾT SỬA ĐỔI, BỔ SUNG MỘT SỐ ĐIỀU CỦA NGHỊ QUYẾT SỐ 23/2015/NQ-HDND NGÀY 10 THÁNG 7 NĂM 2015 CỦA HỘI ĐỒNG NHÂN DÂN TỈNH ĐỒNG THÁP...',
-      type: 'Nghị quyết',
-      status: 'Đã biết',
-      code: '120/2017/NQ-HDND',
-      province: 'Tỉnh Đồng Tháp',
-      issuer: 'Phan Văn Thắng',
-      date: '14/07/2017',
-      field: 'administrative',
-      tags: ['Nghị quyết', 'Sửa đổi', 'Khuyến khích'],
-      author: {
-        id: 3,
-        name: 'Phan Văn Thắng',
-        avatar: null
-      },
-      voteCount: 3,
-      answerCount: 2,
-      viewCount: 80,
-      hasAcceptedAnswer: false,
-      createdAt: new Date('2017-07-14')
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  const legalFields = useMemo(() => {
+    if (!legalDocuments.length) return BASE_LEGAL_FIELDS;
+    const fieldCounts = legalDocuments.reduce((acc, doc) => {
+      if (doc.field) {
+        acc[doc.field] = (acc[doc.field] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    const total = legalDocuments.length;
+
+    return BASE_LEGAL_FIELDS.map((field) => {
+      if (field.id === 'all') {
+        return { ...field, count: total };
+      }
+      return { ...field, count: fieldCounts[field.id] || 0 };
+    });
+  }, [legalDocuments]);
+
+  const filteredDocuments = useMemo(() => {
+    let baseList = legalDocuments;
+    if (selectedField !== 'all') {
+      baseList = legalDocuments.filter((doc) => doc.field === selectedField);
     }
-  ];
 
-  const filteredDocuments = legalDocuments.filter(doc => {
-    if (selectedField === 'all') return true;
-    return doc.field === selectedField;
-  });
+    const sorted = [...baseList];
+
+    switch (activeFilter) {
+      case 'newest':
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.date || 0).getTime();
+          const dateB = new Date(b.date || 0).getTime();
+          return dateB - dateA;
+        });
+      case 'popular':
+        return sorted.sort((a, b) => (b.summary?.length || 0) - (a.summary?.length || 0));
+      case 'effective': {
+        const effectiveDocs = sorted.filter((doc) =>
+          (doc.status || '').toLowerCase().includes('hiệu lực')
+        );
+        return effectiveDocs.length ? effectiveDocs : sorted;
+      }
+      case 'category':
+        return sorted.sort((a, b) =>
+          (a.field || '').localeCompare(b.field || '')
+        );
+      default:
+        return sorted;
+    }
+  }, [legalDocuments, selectedField, activeFilter]);
 
   const renderLegalFieldCard = (field) => (
     <TouchableOpacity
@@ -202,24 +197,33 @@ const LegalDocuments = () => {
     </TouchableOpacity>
   );
 
+  const uniqueProvinces = useMemo(() => {
+    const provinceSet = new Set(legalDocuments.map((doc) => doc.province));
+    provinceSet.delete('Không rõ cơ quan ban hành');
+    return provinceSet.size;
+  }, [legalDocuments]);
+
+  const effectiveCount = useMemo(() => {
+    if (!legalDocuments.length) return 0;
+    return legalDocuments.filter(
+      (doc) => !(doc.status || '').toLowerCase().includes('hết hiệu lực')
+    ).length;
+  }, [legalDocuments]);
+
   const renderStatsCard = () => (
     <View style={styles.statsContainer}>
       <View style={styles.statsCard}>
-        <Text style={styles.statsNumber}>50</Text>
+        <Text style={styles.statsNumber}>{legalDocuments.length}</Text>
         <Text style={styles.statsLabel}>Văn bản pháp luật</Text>
       </View>
       <View style={styles.statsCard}>
-        <Text style={styles.statsNumber}>13</Text>
+        <Text style={styles.statsNumber}>{uniqueProvinces}</Text>
         <Text style={styles.statsLabel}>Cơ quan ban hành</Text>
       </View>
       <View style={styles.statsCard}>
-        <Text style={styles.statsNumber}>10</Text>
+        <Text style={styles.statsNumber}>{effectiveCount}</Text>
         <Text style={styles.statsLabel}>Văn bản hiệu lực</Text>
       </View>
-      {/* <View style={styles.statsCard}>
-        <Text style={styles.statsNumber}>24/7</Text>
-        <Text style={styles.statsLabel}>Cập nhật thường xuyên</Text>
-      </View> */}
     </View>
   );
 
@@ -311,7 +315,30 @@ const LegalDocuments = () => {
 
           {/* Documents List */}
           <View style={styles.documentsContainer}>
-            {filteredDocuments.map((document) => (
+            {loading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={COLORS.BLUE} />
+                <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+              </View>
+            )}
+
+            {!loading && error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchDocuments}>
+                  <Ionicons name="refresh-outline" size={16} color={COLORS.WHITE} />
+                  <Text style={styles.retryText}>Thử lại</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!loading && !error && !filteredDocuments.length && (
+              <Text style={styles.emptyText}>
+                Không tìm thấy văn bản phù hợp với bộ lọc hiện tại.
+              </Text>
+            )}
+
+            {!loading && !error && filteredDocuments.map((document) => (
               <LegalDocumentCard
                 key={document.id}
                 document={document}
@@ -542,6 +569,48 @@ const styles = StyleSheet.create({
   },
   documentsContainer: {
     marginTop: 8,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  loadingText: {
+    color: COLORS.GRAY_DARK,
+    fontSize: 14,
+    marginTop: 8,
+  },
+  errorContainer: {
+    backgroundColor: COLORS.RED_LIGHT,
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: COLORS.RED,
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.RED,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: COLORS.WHITE,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: COLORS.GRAY,
+    paddingVertical: 24,
   },
   quickActions: {
     backgroundColor: COLORS.WHITE,
