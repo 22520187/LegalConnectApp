@@ -12,6 +12,37 @@ const FIELD_MAP = {
   'chỉ thị': 'administrative',
 };
 
+const seenDocumentIds = new Set();
+
+const buildDocumentId = (row, index) => {
+  const candidates = [
+    row._id,
+    row.so_hieu,
+    row.link,
+    row.title && `${row.title}-${row.noi_ban_hanh || ''}`,
+  ]
+    .map((value) => (value ? normalizeWhitespace(String(value)) : null))
+    .filter(Boolean);
+
+  candidates.push(`doc-${index}`);
+
+  for (const candidate of candidates) {
+    if (!seenDocumentIds.has(candidate)) {
+      seenDocumentIds.add(candidate);
+      return candidate;
+    }
+  }
+
+  let suffix = index + 1;
+  while (true) {
+    const fallbackId = `doc-${suffix++}`;
+    if (!seenDocumentIds.has(fallbackId)) {
+      seenDocumentIds.add(fallbackId);
+      return fallbackId;
+    }
+  }
+};
+
 const normalizeWhitespace = (text = '') =>
   text.replace(/\s+/g, ' ').trim();
 
@@ -86,12 +117,12 @@ const normalizeStatus = (rawStatus) => {
   return normalized;
 };
 
-const mapRowToDocument = (row) => {
+const mapRowToDocument = (row, index) => {
   const type = row.loai_van_ban?.trim() || 'Văn bản';
   const field = inferField(type, row.cleaned_content);
 
   return {
-    id: row._id || row.so_hieu || row.link,
+    id: buildDocumentId(row, index),
     title: row.title?.trim() || 'Văn bản pháp luật',
     summary: buildSummary(row),
     type,
@@ -125,7 +156,7 @@ const main = () => {
 
   const dataset = parsed.data
     .filter((row) => row && row.title)
-    .map(mapRowToDocument);
+    .map((row, index) => mapRowToDocument(row, index));
 
   fs.writeFileSync(OUTPUT_JSON, JSON.stringify(dataset, null, 2), 'utf8');
   console.log(`Đã tạo ${dataset.length} văn bản tại ${OUTPUT_JSON}`);

@@ -354,9 +354,9 @@ const LegalDocuments = () => {
               </Text>
             )}
 
-            {!loading && !error && filteredDocuments.map((document) => (
+            {!loading && !error && filteredDocuments.map((document, index) => (
               <LegalDocumentCard
-                key={document.id}
+                key={`${document.id || document.code || 'document'}-${index}`}
                 document={document}
                 onViewDetail={handleViewDetail}
                 onDownload={handleDownload}
