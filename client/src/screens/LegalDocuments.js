@@ -8,6 +8,8 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -236,9 +238,23 @@ const LegalDocuments = () => {
     console.log('Download document:', document.title);
   };
 
-  const handleViewSource = (document) => {
-    // Implement view source functionality
-    console.log('View source:', document.title);
+  const handleViewSource = async (document) => {
+    if (!document.link) {
+      Alert.alert('Không có nguồn', 'Văn bản này chưa có đường dẫn tham khảo.');
+      return;
+    }
+
+    try {
+      const supported = await Linking.canOpenURL(document.link);
+      if (supported) {
+        await Linking.openURL(document.link);
+      } else {
+        Alert.alert('Không thể mở liên kết', document.link);
+      }
+    } catch (error) {
+      console.error('Không thể mở liên kết:', error);
+      Alert.alert('Lỗi', 'Không thể mở liên kết nguồn. Vui lòng thử lại sau.');
+    }
   };
 
   return (
