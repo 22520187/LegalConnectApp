@@ -27,7 +27,7 @@ const mapPostToQuestion = (post) => {
         id: post.id,
         title: post.title || '',
         summary: createSummary(post.content || ''),
-        voteCount: post.views || 0, // Using views as voteCount for now
+        voteCount: post.upvoteCount || 0, // Using views as voteCount for now
         answerCount: post.replyCount || 0,
         viewCount: post.views || 0,
         tags: tagsArray,

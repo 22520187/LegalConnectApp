@@ -24,9 +24,16 @@ const QuestionDetail = ({ route, navigation }) => {
   const { question } = route.params;
   const { user } = useAuth();
   const postId = question.id || question.postId; // Get postId from question
-  const [userVote, setUserVote] = useState(null); // 'upvote', 'downvote', or null
+  const initialUpvotes = question?.upvoteCount ?? question?.upvotes ?? 0;
+  const initialDownvotes = question?.downvoteCount ?? question?.downvotes ?? 0;
+  const initialUserVote = question?.userVote ? question.userVote.toLowerCase() : null;
+  const [voteStats, setVoteStats] = useState({
+    upvoteCount: initialUpvotes,
+    downvoteCount: initialDownvotes,
+  });
+  const [userVote, setUserVote] = useState(initialUserVote); // 'upvote', 'downvote', or null
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [voteCount, setVoteCount] = useState(question.voteCount);
+  const netVoteCount = (voteStats.upvoteCount || 0) - (voteStats.downvoteCount || 0);
   const [expandedComments, setExpandedComments] = useState({});
   const [showCommentInput, setShowCommentInput] = useState({});
   const [replyTo, setReplyTo] = useState(null);
@@ -38,6 +45,28 @@ const QuestionDetail = ({ route, navigation }) => {
   const [reportTarget, setReportTarget] = useState(null);
   const [loadingReplies, setLoadingReplies] = useState(true);
   const currentUserId = user?.id || user?.userId;
+
+  const loadPostVotes = async () => {
+    if (!postId) return;
+    try {
+      const stats = await ForumService.getPostVotes(postId);
+      if (stats) {
+        setVoteStats({
+          upvoteCount: stats.upvoteCount ?? 0,
+          downvoteCount: stats.downvoteCount ?? 0,
+        });
+        setUserVote(stats.userVote ? stats.userVote.toLowerCase() : null);
+      }
+    } catch (error) {
+      console.error('Error loading post votes:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (postId) {
+      loadPostVotes();
+    }
+  }, [postId]);
 
   // Load replies from API
   useEffect(() => {
@@ -62,8 +91,10 @@ const QuestionDetail = ({ route, navigation }) => {
           title: reply.author?.role || '',
           reputation: 0, // Backend doesn't provide this
         },
+        upvoteCount: reply.upvoteCount || 0,
+        downvoteCount: reply.downvoteCount || 0,
         voteCount: (reply.upvoteCount || 0) - (reply.downvoteCount || 0),
-        userVote: reply.userVote, // 'UPVOTE', 'DOWNVOTE', or null
+        userVote: reply.userVote || null, // 'UPVOTE', 'DOWNVOTE', or null
         createdAt: new Date(reply.createdAt),
         isAccepted: reply.isSolution || false,
         comments: reply.children ? reply.children.map(child => ({
@@ -129,21 +160,33 @@ const QuestionDetail = ({ route, navigation }) => {
     }
   };
 
-  const handleVote = (type) => {
-    if (userVote === type) {
-      // Remove vote
-      setUserVote(null);
-      setVoteCount(prev => type === 'upvote' ? prev - 1 : prev + 1);
-    } else {
-      // Add or change vote
-      const oldVote = userVote;
-      setUserVote(type);
-      
-      if (oldVote === null) {
-        setVoteCount(prev => type === 'upvote' ? prev + 1 : prev - 1);
-      } else {
-        setVoteCount(prev => type === 'upvote' ? prev + 2 : prev - 2);
+  const handleVote = async (type) => {
+    if (!postId) {
+      Alert.alert('Lỗi', 'Không tìm thấy bài viết');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Thông báo', 'Vui lòng đăng nhập để bình chọn.');
+      return;
+    }
+
+    const isRemoving = userVote === type;
+    const votePayload = isRemoving ? 'NONE' : (type === 'upvote' ? 'UPVOTE' : 'DOWNVOTE');
+
+    try {
+      const response = await ForumService.votePost(postId, votePayload);
+      if (response) {
+        setVoteStats({
+          upvoteCount: response.upvoteCount ?? voteStats.upvoteCount,
+          downvoteCount: response.downvoteCount ?? voteStats.downvoteCount,
+        });
+        setUserVote(response.userVote ? response.userVote.toLowerCase() : null);
       }
+    } catch (error) {
+      console.error('Error voting post:', error);
+      const message = error?.response?.data?.message || 'Không thể thực hiện bình chọn. Vui lòng thử lại.';
+      Alert.alert('Lỗi', message);
     }
   };
 
@@ -193,8 +236,43 @@ const QuestionDetail = ({ route, navigation }) => {
     setReportTarget(null);
   };
 
-  const handleAnswerVote = (answerId, type) => {
-    Alert.alert('Vote Answer', `${type} answer ${answerId}`);
+  const handleAnswerVote = async (answerId, type) => {
+    if (!user) {
+      Alert.alert('Thông báo', 'Vui lòng đăng nhập để bình chọn câu trả lời.');
+      return;
+    }
+
+    const targetAnswer = answersData.find(answer => answer.id === answerId);
+    if (!targetAnswer) {
+      console.warn('Answer not found for voting:', answerId);
+      return;
+    }
+
+    const normalizedVote = targetAnswer.userVote ? targetAnswer.userVote.toLowerCase() : null;
+    const votePayload = normalizedVote === type ? 'NONE' : (type === 'upvote' ? 'UPVOTE' : 'DOWNVOTE');
+
+    try {
+      const response = await ForumService.voteReply(answerId, votePayload);
+      if (response) {
+        setAnswersData(prev =>
+          prev.map(answer =>
+            answer.id === answerId
+              ? {
+                  ...answer,
+                  voteCount: (response.upvoteCount || 0) - (response.downvoteCount || 0),
+                  upvoteCount: response.upvoteCount ?? 0,
+                  downvoteCount: response.downvoteCount ?? 0,
+                  userVote: response.userVote || null,
+                }
+              : answer
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error voting reply:', error);
+      const message = error?.response?.data?.message || 'Không thể bình chọn câu trả lời. Vui lòng thử lại.';
+      Alert.alert('Lỗi', message);
+    }
   };
 
   const handleMarkAsAccepted = (answerId) => {
@@ -404,7 +482,7 @@ const QuestionDetail = ({ route, navigation }) => {
           styles.actionButtonText,
           userVote === 'upvote' && styles.activeUpvoteText
         ]}>
-          {voteCount}
+          {netVoteCount}
         </Text>
       </TouchableOpacity>
 
@@ -440,7 +518,10 @@ const QuestionDetail = ({ route, navigation }) => {
     </View>
   );
 
-  const renderAnswer = (answer) => (
+  const renderAnswer = (answer) => {
+    const normalizedVote = answer.userVote ? answer.userVote.toLowerCase() : null;
+
+    return (
     <View key={answer.id} style={styles.answerContainer}>
       {answer.isAccepted && (
         <View style={styles.acceptedBadge}>
@@ -484,15 +565,28 @@ const QuestionDetail = ({ route, navigation }) => {
             style={styles.voteButton}
             onPress={() => handleAnswerVote(answer.id, 'upvote')}
           >
-            <Ionicons name="arrow-up" size={20} color={COLORS.GRAY} />
-            <Text style={styles.voteText}>{answer.voteCount}</Text>
+            <Ionicons 
+              name="arrow-up" 
+              size={20} 
+              color={normalizedVote === 'upvote' ? COLORS.GREEN : COLORS.GRAY} 
+            />
+            <Text style={[
+              styles.voteText,
+              normalizedVote === 'upvote' && styles.voteTextUpvote
+            ]}>
+              {answer.voteCount}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.voteButton}
             onPress={() => handleAnswerVote(answer.id, 'downvote')}
           >
-            <Ionicons name="arrow-down" size={20} color={COLORS.GRAY} />
+            <Ionicons 
+              name="arrow-down" 
+              size={20} 
+              color={normalizedVote === 'downvote' ? COLORS.RED : COLORS.GRAY} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -564,6 +658,7 @@ const QuestionDetail = ({ route, navigation }) => {
       )}
     </View>
   );
+  };
 
   const renderRelatedQuestions = () => (
     <View style={styles.relatedSection}>
@@ -985,6 +1080,9 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     marginLeft: 4,
     fontWeight: '600',
+  },
+  voteTextUpvote: {
+    color: COLORS.GREEN,
   },
   acceptButton: {
     flexDirection: 'row',

@@ -196,8 +196,8 @@ export const deletePost = async (postId) => {
 /**
  * Vote on a post
  * @param {number} postId - Post ID
- * @param {number} voteType - Vote type (1 for upvote, -1 for downvote)
- * @returns {Promise<Object>} Updated post
+ * @param {'UPVOTE'|'DOWNVOTE'|'NONE'} voteType - Vote action
+ * @returns {Promise<Object>} Vote response (VoteDto)
  */
 export const votePost = async (postId, voteType) => {
     try {
@@ -211,6 +211,70 @@ export const votePost = async (postId, voteType) => {
         }
     } catch (error) {
         console.error('Error voting post:', error);
+        throw error;
+    }
+};
+
+/**
+ * Vote on a reply
+ * @param {number} replyId - Reply ID
+ * @param {'UPVOTE'|'DOWNVOTE'|'NONE'} voteType - Vote action
+ * @returns {Promise<Object>} Vote response (VoteDto)
+ */
+export const voteReply = async (replyId, voteType) => {
+    try {
+        const response = await apiClient.post(`/forum/replies/${replyId}/vote`, { voteType });
+        
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error voting reply:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get aggregated vote stats for a post
+ * @param {number} postId - Post ID
+ * @returns {Promise<Object|null>} Vote statistics (VoteDto)
+ */
+export const getPostVotes = async (postId) => {
+    try {
+        const response = await apiClient.get(`/forum/posts/${postId}/votes`);
+        
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching post votes:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get aggregated vote stats for a reply
+ * @param {number} replyId - Reply ID
+ * @returns {Promise<Object|null>} Vote statistics (VoteDto)
+ */
+export const getReplyVotes = async (replyId) => {
+    try {
+        const response = await apiClient.get(`/forum/replies/${replyId}/votes`);
+        
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching reply votes:', error);
         throw error;
     }
 };
@@ -292,6 +356,9 @@ const ForumService = {
     updatePost,
     deletePost,
     votePost,
+    voteReply,
+    getPostVotes,
+    getReplyVotes,
     getReplies,
     createReply,
     getCategories,
