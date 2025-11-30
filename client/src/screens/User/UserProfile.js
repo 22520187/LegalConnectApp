@@ -8,20 +8,27 @@ import {
   StatusBar,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import COLORS from '../../constant/colors';
 import ReportModal from '../../components/ReportModal/ReportModal';
+import { useAuth } from '../../context/AuthContext';
+import { getOrCreateConversation } from '../../services/MessageService';
 
 const UserProfile = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { userId, userName, userAvatar } = route.params;
+  const { user: currentUser } = useAuth();
   
-  const [isFollowing, setIsFollowing] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+  
+  // Kiểm tra xem đây có phải profile của chính mình không
+  const isOwnProfile = currentUser && currentUser.id === userId;
 
   // Mock user profile data
   const [userProfile] = useState({
@@ -91,23 +98,36 @@ const UserProfile = () => {
     }
   };
 
-  const handleStartChat = () => {
-    navigation.navigate('ChatScreen', {
-      userId: userProfile.id,
-      userName: userProfile.name,
-      userAvatar: userProfile.avatar,
-      isOnline: userProfile.isOnline,
-    });
-  };
-
-  const handleFollow = () => {
-    setIsFollowing(!isFollowing);
-    Alert.alert(
-      isFollowing ? 'Bỏ theo dõi' : 'Theo dõi',
-      isFollowing 
-        ? `Đã bỏ theo dõi ${userProfile.name}` 
-        : `Đã theo dõi ${userProfile.name}`
-    );
+  const handleStartChat = async () => {
+    try {
+      setIsLoadingChat(true);
+      
+      // Gọi API để lấy hoặc tạo conversation
+      const conversation = await getOrCreateConversation(userProfile.id);
+      
+      if (!conversation || !conversation.id) {
+        Alert.alert('Lỗi', 'Không thể tạo cuộc trò chuyện. Vui lòng thử lại.');
+        setIsLoadingChat(false);
+        return;
+      }
+      
+      // Navigate với conversationId
+      navigation.navigate('ChatScreen', {
+        conversationId: conversation.id,
+        userId: userProfile.id,
+        userName: userProfile.name,
+        userAvatar: userProfile.avatar,
+        isOnline: userProfile.isOnline,
+      });
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      Alert.alert(
+        'Lỗi',
+        error.response?.data?.message || 'Không thể bắt đầu cuộc trò chuyện. Vui lòng thử lại.'
+      );
+    } finally {
+      setIsLoadingChat(false);
+    }
   };
 
   const handleReport = () => {
@@ -241,32 +261,24 @@ const UserProfile = () => {
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={handleStartChat}
-          >
-            <Ionicons name="chatbubble-outline" size={20} color={COLORS.WHITE} />
-            <Text style={styles.primaryButtonText}>Nhắn tin</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.secondaryButton, isFollowing && styles.followingButton]}
-            onPress={handleFollow}
-          >
-            <Ionicons 
-              name={isFollowing ? "person-remove-outline" : "person-add-outline"} 
-              size={20} 
-              color={isFollowing ? COLORS.WHITE : COLORS.BLUE} 
-            />
-            <Text style={[
-              styles.secondaryButtonText,
-              isFollowing && styles.followingButtonText
-            ]}>
-              {isFollowing ? 'Bỏ theo dõi' : 'Theo dõi'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {!isOwnProfile && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.primaryButton, isLoadingChat && styles.primaryButtonDisabled]}
+              onPress={handleStartChat}
+              disabled={isLoadingChat}
+            >
+              {isLoadingChat ? (
+                <ActivityIndicator size="small" color={COLORS.WHITE} />
+              ) : (
+                <>
+                  <Ionicons name="chatbubble-outline" size={20} color={COLORS.WHITE} />
+                  <Text style={styles.primaryButtonText}>Nhắn tin</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Stats Section */}
         <View style={styles.statsSection}>
@@ -446,7 +458,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.BLUE,
     paddingVertical: 12,
     borderRadius: 8,
-    marginRight: 8,
   },
   primaryButtonText: {
     color: COLORS.WHITE,
@@ -454,30 +465,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  secondaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.WHITE,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.BLUE,
-    marginLeft: 8,
-  },
-  followingButton: {
-    backgroundColor: COLORS.GRAY,
-    borderColor: COLORS.GRAY,
-  },
-  secondaryButtonText: {
-    color: COLORS.BLUE,
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  followingButtonText: {
-    color: COLORS.WHITE,
+  primaryButtonDisabled: {
+    opacity: 0.6,
   },
   statsSection: {
     backgroundColor: COLORS.WHITE,

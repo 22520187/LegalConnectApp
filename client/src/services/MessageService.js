@@ -91,9 +91,7 @@ export const createConversation = async (otherUserId, initialMessage = null) => 
 */
 export const getOrCreateConversation = async (otherUserId) => {
     try {
-        const response = await apiClient.post('/user-conversations/get-or-create', null, {
-            params: { otherUserId }
-        });
+        const response = await apiClient.post(`/user-conversations/get-or-create?otherUserId=${otherUserId}`);
         if (response.status >= 200 && response.status < 300) {
             return response.data;
         } else {
