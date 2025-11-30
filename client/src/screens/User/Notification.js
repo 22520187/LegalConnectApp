@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,142 +7,227 @@ import {
   TouchableOpacity,
   StatusBar,
   RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import NotificationService from '../../services/NotificationService';
+
+// Map notification type từ API sang UI format
+const mapNotificationType = (type) => {
+  switch (type) {
+    case 'MENTION':
+      return {
+        icon: 'chatbubble',
+        iconColor: COLORS.BLUE,
+        title: 'Bạn được nhắc đến',
+      };
+    case 'REPLY':
+      return {
+        icon: 'chatbubbles',
+        iconColor: COLORS.BLUE,
+        title: 'Có người trả lời',
+      };
+    case 'UPVOTE':
+      return {
+        icon: 'thumbs-up',
+        iconColor: COLORS.ORANGE,
+        title: 'Câu trả lời được vote up',
+      };
+    default:
+      return {
+        icon: 'notifications',
+        iconColor: COLORS.GRAY,
+        title: 'Thông báo',
+      };
+  }
+};
+
+// Map notification từ API format sang UI format
+const mapNotification = (notification) => {
+  const typeInfo = mapNotificationType(notification.type);
+  return {
+    id: notification.id,
+    title: typeInfo.title,
+    message: notification.message,
+    type: notification.type,
+    isRead: notification.isRead,
+    createdAt: new Date(notification.createdAt),
+    icon: typeInfo.icon,
+    iconColor: typeInfo.iconColor,
+    relatedEntityId: notification.relatedEntityId,
+    relatedEntityType: notification.relatedEntityType,
+  };
+};
 
 const Notification = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [notifications, setNotifications] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const loadingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const loadingMoreRef = useRef(false);
 
-  // Mock notifications data
-  const mockNotifications = [
-    {
-      id: 1,
-      title: 'Câu hỏi của bạn đã được trả lời',
-      message: 'John Doe đã trả lời câu hỏi "Làm thế nào để khởi kiện doanh nghiệp?"',
-      type: 'answer',
-      isRead: false,
-      createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      icon: 'chatbubble',
-      iconColor: COLORS.BLUE,
-    },
-    {
-      id: 2,
-      title: 'Bài viết mới từ chuyên gia',
-      message: 'Luật sư Nguyễn Văn A đã đăng bài viết về "Quyền lợi người lao động"',
-      type: 'post',
-      isRead: true,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      icon: 'document-text',
-      iconColor: COLORS.GREEN,
-    },
-    {
-      id: 3,
-      title: 'Câu hỏi được vote up',
-      message: 'Câu hỏi của bạn về "Hợp đồng lao động" đã nhận được 5 votes',
-      type: 'vote',
-      isRead: false,
-      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-      icon: 'thumbs-up',
-      iconColor: COLORS.ORANGE,
-    },
-    {
-      id: 4,
-      title: 'Có người theo dõi bạn',
-      message: 'Sarah Wilson đã bắt đầu theo dõi bạn',
-      type: 'follow',
-      isRead: true,
-      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-      icon: 'person-add',
-      iconColor: COLORS.PURPLE,
-    },
-    {
-      id: 5,
-      title: 'Bình luận mới',
-      message: 'Mike Chen đã bình luận về câu trả lời của bạn',
-      type: 'comment',
-      isRead: false,
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-      icon: 'chatbubbles',
-      iconColor: COLORS.BLUE,
-    },
-    {
-      id: 6,
-      title: 'Lời nhắc đánh giá',
-      message: 'Đừng quên đánh giá câu trả lời hữu ích nhất cho câu hỏi của bạn',
-      type: 'reminder',
-      isRead: true,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-      icon: 'star',
-      iconColor: COLORS.YELLOW,
-    },
-    {
-      id: 7,
-      title: 'Cập nhật hệ thống',
-      message: 'Ứng dụng đã được cập nhật với nhiều tính năng mới',
-      type: 'system',
-      isRead: true,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-      icon: 'refresh',
-      iconColor: COLORS.GRAY,
-    },
-  ];
+  const loadNotifications = useCallback(async (pageNum = 0, append = false) => {
+    // Prevent multiple simultaneous calls
+    if (loadingRef.current) {
+      return;
+    }
 
-  useEffect(() => {
-    loadNotifications();
+    try {
+      loadingRef.current = true;
+      setLoading(true);
+      const unreadOnly = activeTab === 'unread' ? true : null;
+      const response = await NotificationService.getNotifications(unreadOnly, pageNum, 20);
+      
+      if (!mountedRef.current) return;
+      
+      if (response && response.content) {
+        const mappedNotifications = response.content.map(mapNotification);
+        
+        if (append) {
+          setNotifications(prev => [...prev, ...mappedNotifications]);
+        } else {
+          setNotifications(mappedNotifications);
+        }
+        
+        setTotalElements(response.totalElements || 0);
+        setHasMore(!response.last);
+        setPage(pageNum);
+      } else {
+        if (!append) {
+          setNotifications([]);
+        }
+      }
+    } catch (error) {
+      if (!mountedRef.current) return;
+      console.error('Error loading notifications:', error);
+      Alert.alert('Lỗi', 'Không thể tải thông báo. Vui lòng thử lại.');
+      if (!append) {
+        setNotifications([]);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+      loadingRef.current = false;
+    }
   }, [activeTab]);
 
-  const loadNotifications = () => {
-    let filteredNotifications = [...mockNotifications];
-    
-    if (activeTab === 'unread') {
-      filteredNotifications = filteredNotifications.filter(n => !n.isRead);
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const count = await NotificationService.getUnreadCount();
+      if (mountedRef.current) {
+        setUnreadCount(count || 0);
+      }
+    } catch (error) {
+      console.error('Error loading unread count:', error);
     }
-    
-    setNotifications(filteredNotifications);
-  };
+  }, []);
 
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-  };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      loadNotifications();
-      setRefreshing(false);
-    }, 1000);
-  };
+  useEffect(() => {
+    if (mountedRef.current) {
+      loadNotifications(0, false);
+      loadUnreadCount();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
-  const handleNotificationPress = (notification) => {
-    // Mark as read
+  const handleTabChange = useCallback((tab) => {
+    if (tab !== activeTab) {
+      setActiveTab(tab);
+      setPage(0);
+      setHasMore(true);
+    }
+  }, [activeTab]);
+
+  const handleRefresh = useCallback(() => {
+    if (!loadingRef.current) {
+      setRefreshing(true);
+      loadNotifications(0, false);
+      loadUnreadCount();
+    }
+  }, [loadNotifications, loadUnreadCount]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loadingRef.current && !loadingMoreRef.current && !loading && hasMore && notifications.length > 0) {
+      loadingMoreRef.current = true;
+      loadNotifications(page + 1, true).finally(() => {
+        loadingMoreRef.current = false;
+      });
+    }
+  }, [loading, hasMore, page, notifications.length, loadNotifications]);
+
+  const handleNotificationPress = useCallback(async (notification) => {
+    // Mark as read if not already read
     if (!notification.isRead) {
-      setNotifications(prev => 
-        prev.map(n => 
-          n.id === notification.id ? { ...n, isRead: true } : n
-        )
-      );
+      try {
+        await NotificationService.markAsRead(notification.id);
+        if (mountedRef.current) {
+          setNotifications(prev => 
+            prev.map(n => 
+              n.id === notification.id ? { ...n, isRead: true } : n
+            )
+          );
+          // Update unread count
+          loadUnreadCount();
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
     }
 
-    // Navigate based on notification type
-    switch (notification.type) {
-      case 'answer':
-      case 'comment':
-      case 'vote':
-        // Navigate to question detail
-        // navigation.navigate('QuestionDetail', { questionId: notification.relatedId });
-        break;
-      case 'follow':
-        // Navigate to user profile
-        // navigation.navigate('UserProfile', { userId: notification.relatedId });
-        break;
-      default:
-        break;
+    // Navigate based on notification type and related entity
+    if (notification.relatedEntityId) {
+      switch (notification.relatedEntityType) {
+        case 'POST':
+          // Navigate to question/post detail
+          // navigation.navigate('QuestionDetail', { questionId: notification.relatedEntityId });
+          break;
+        case 'REPLY':
+          // Navigate to question detail with reply focus
+          // navigation.navigate('QuestionDetail', { 
+          //   questionId: notification.relatedEntityId,
+          //   replyId: notification.relatedEntityId 
+          // });
+          break;
+        default:
+          break;
+      }
     }
-  };
+  }, [loadUnreadCount]);
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    try {
+      const success = await NotificationService.markAllAsRead();
+      if (success && mountedRef.current) {
+        // Update all notifications to read
+        setNotifications(prev => 
+          prev.map(n => ({ ...n, isRead: true }))
+        );
+        setUnreadCount(0);
+        Alert.alert('Thành công', 'Đã đánh dấu tất cả thông báo là đã đọc');
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      Alert.alert('Lỗi', 'Không thể đánh dấu tất cả là đã đọc. Vui lòng thử lại.');
+    }
+  }, []);
 
   const formatTimeAgo = (date) => {
     const now = new Date();
@@ -201,8 +286,6 @@ const Notification = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const unreadCount = mockNotifications.filter(n => !n.isRead).length;
-
   return (
     <View style={styles.container}>
       <StatusBar 
@@ -222,40 +305,60 @@ const Notification = ({ navigation }) => {
           
           <Text style={styles.headerTitle}>Thông báo</Text>
           
-          <TouchableOpacity style={styles.markAllReadButton}>
+          <TouchableOpacity 
+            style={styles.markAllReadButton}
+            onPress={handleMarkAllAsRead}
+          >
             <Text style={styles.markAllReadText}>Đọc tất cả</Text>
           </TouchableOpacity>
         </View>
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
-          {renderTabButton('all', `Tất cả (${mockNotifications.length})`)}
+          {renderTabButton('all', `Tất cả (${totalElements})`)}
           {renderTabButton('unread', `Chưa đọc (${unreadCount})`)}
         </View>
 
         {/* Notifications List */}
-        <FlatList
-          data={notifications}
-          renderItem={renderNotificationItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[COLORS.BLUE]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="notifications-outline" size={64} color={COLORS.GRAY} />
-              <Text style={styles.emptyText}>
-                {activeTab === 'unread' ? 'Không có thông báo chưa đọc' : 'Không có thông báo'}
-              </Text>
-            </View>
-          }
-        />
+        {loading && notifications.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.BLUE} />
+            <Text style={styles.loadingText}>Đang tải thông báo...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            renderItem={renderNotificationItem}
+            keyExtractor={(item) => item.id.toString()}
+            style={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[COLORS.BLUE]}
+              />
+            }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.3}
+            removeClippedSubviews={true}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="notifications-outline" size={64} color={COLORS.GRAY} />
+                <Text style={styles.emptyText}>
+                  {activeTab === 'unread' ? 'Không có thông báo chưa đọc' : 'Không có thông báo'}
+                </Text>
+              </View>
+            }
+            ListFooterComponent={
+              loading && notifications.length > 0 ? (
+                <View style={styles.footerLoading}>
+                  <ActivityIndicator size="small" color={COLORS.BLUE} />
+                </View>
+              ) : null
+            }
+          />
+        )}
       </SafeAreaView>
     </View>
   );
@@ -397,6 +500,21 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     marginTop: 16,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: COLORS.GRAY,
+    marginTop: 16,
+  },
+  footerLoading: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
 
