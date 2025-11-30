@@ -149,3 +149,27 @@ export const markConversationAsRead = async (conversationId) => {
         throw error;
     }
 };
+
+/**
+ * Lấy danh sách user online
+ * @returns {Promise<Object>} Object chứa users, lawyers và totalOnline
+ * @returns {Promise<{users: Array, lawyers: Array, totalOnline: number}>}
+ */
+export const getOnlineUsers = async () => {
+    try {
+        const response = await apiClient.get('/chat/online-users');
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return {
+                users: [],
+                lawyers: [],
+                totalOnline: 0
+            };
+        }
+    } catch (error) {
+        console.error('Error fetching online users:', error);
+        throw error;
+    }
+};

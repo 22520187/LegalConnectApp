@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import COLORS from '../../constant/colors';
-import { getUserConversations } from '../../services/MessageService';
+import { getUserConversations, getOnlineUsers } from '../../services/MessageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Message = () => {
@@ -24,6 +24,7 @@ const Message = () => {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState({ users: [], lawyers: [], totalOnline: 0 });
 
   // Load current user ID
   useEffect(() => {
@@ -41,14 +42,26 @@ const Message = () => {
     loadCurrentUser();
   }, []);
 
-  // Load conversations when screen is focused
+  // Load conversations and online users when screen is focused
   useFocusEffect(
     useCallback(() => {
       loadConversations();
+      loadOnlineUsers();
     }, [])
   );
 
-  const loadConversations = async () => {
+  // Helper function to check if user is online
+  const isUserOnline = (userId, onlineUsersList) => {
+    if (!userId) return false;
+    const userIdStr = userId.toString();
+    const allOnlineUsers = [...(onlineUsersList.users || []), ...(onlineUsersList.lawyers || [])];
+    return allOnlineUsers.some(user => {
+      const onlineUserId = user.userId?.toString();
+      return onlineUserId === userIdStr || onlineUserId === userId;
+    });
+  };
+
+  const loadConversations = async (onlineUsersData = null) => {
     try {
       setLoading(true);
       const data = await getUserConversations();
@@ -56,23 +69,32 @@ const Message = () => {
       // Đảm bảo luôn có array để map
       const conversationsArray = Array.isArray(data) ? data : [];
       
+      // Use provided onlineUsersData or current state
+      const currentOnlineUsers = onlineUsersData || onlineUsers;
+      
       // Transform API data to match component format
-      const transformedConversations = conversationsArray.map(conv => ({
-        id: conv.id,
-        user: {
-          id: conv.participant?.id,
-          name: conv.participant?.name || 'Người dùng',
-          avatar: conv.participant?.avatar || null,
-          isOnline: conv.participant?.online || false,
-        },
-        lastMessage: conv.lastMessage ? {
-          text: conv.lastMessage.content || '',
-          timestamp: new Date(conv.lastMessage.timestamp),
-          isRead: false,
-          senderId: conv.lastMessage.senderId,
-        } : null,
-        unreadCount: conv.unreadCount || 0,
-      }));
+      const transformedConversations = conversationsArray.map(conv => {
+        const participantId = conv.participant?.id;
+        // Check online status from online users list
+        const userIsOnline = isUserOnline(participantId, currentOnlineUsers);
+        
+        return {
+          id: conv.id,
+          user: {
+            id: participantId,
+            name: conv.participant?.name || 'Người dùng',
+            avatar: conv.participant?.avatar || null,
+            isOnline: userIsOnline, // Use online status from online users list
+          },
+          lastMessage: conv.lastMessage ? {
+            text: conv.lastMessage.content || '',
+            timestamp: new Date(conv.lastMessage.timestamp),
+            isRead: false,
+            senderId: conv.lastMessage.senderId,
+          } : null,
+          unreadCount: conv.unreadCount || 0,
+        };
+      });
       
       setConversations(transformedConversations);
     } catch (error) {
@@ -83,6 +105,26 @@ const Message = () => {
       Alert.alert('Lỗi', 'Không thể tải danh sách tin nhắn. Vui lòng thử lại.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOnlineUsers = async () => {
+    try {
+      const data = await getOnlineUsers();
+      if (data) {
+        const newOnlineUsers = {
+          users: data.users || [],
+          lawyers: data.lawyers || [],
+          totalOnline: data.totalOnline || 0,
+        };
+        setOnlineUsers(newOnlineUsers);
+        // Reload conversations with updated online status
+        if (conversations.length > 0) {
+          loadConversations(newOnlineUsers);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading online users:', error);
     }
   };
 
@@ -126,9 +168,10 @@ const Message = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadConversations();
+    await Promise.all([loadConversations(), loadOnlineUsers()]);
     setRefreshing(false);
   };
+
 
   const renderConversationItem = ({ item }) => (
     <TouchableOpacity
@@ -289,14 +332,15 @@ const styles = StyleSheet.create({
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: COLORS.GREEN,
-    borderWidth: 2,
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#31A24C', // Màu xanh giống Facebook
+    borderWidth: 2.5,
     borderColor: COLORS.WHITE,
+    zIndex: 1,
   },
   conversationContent: {
     flex: 1,
