@@ -225,8 +225,8 @@ const QuestionDetail = ({ route, navigation }) => {
   };
 
   const handleReportSubmit = (reportData) => {
+    // ReportModal đã tự xử lý API call, callback này chỉ để xử lý thêm logic nếu cần
     console.log('Report submitted:', reportData);
-    // Here you would typically send the report to your backend
     setShowReportModal(false);
     setReportTarget(null);
   };

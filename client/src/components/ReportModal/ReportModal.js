@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import PostReportService from '../../services/PostReportService';
 
 const { width } = Dimensions.get('window');
 
@@ -72,32 +73,50 @@ const ReportModal = ({
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const reasonText = selectedReason === 'Lý do khác' ? otherReason : selectedReason;
       
-      const reportData = {
-        targetId,
-        targetTitle,
-        reportType,
-        reason: selectedReason === 'Lý do khác' ? otherReason : selectedReason,
-        timestamp: new Date().toISOString(),
-      };
+      // Chỉ gọi API nếu là báo cáo bài viết (post)
+      if (reportType === 'post' && targetId) {
+        const reportData = {
+          reason: reasonText,
+          description: selectedReason === 'Lý do khác' ? otherReason : null,
+        };
 
-      if (onSubmit) {
-        onSubmit(reportData);
+        await PostReportService.reportPost(targetId, reportData);
+
+        Alert.alert(
+          'Báo cáo đã gửi',
+          'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
+          [{ text: 'OK', onPress: onClose }]
+        );
+      } else {
+        // Nếu là báo cáo user hoặc không có targetId, vẫn gọi callback nếu có
+        const reportData = {
+          targetId,
+          targetTitle,
+          reportType,
+          reason: reasonText,
+          timestamp: new Date().toISOString(),
+        };
+
+        if (onSubmit) {
+          onSubmit(reportData);
+        }
+
+        Alert.alert(
+          'Báo cáo đã gửi',
+          'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
+          [{ text: 'OK', onPress: onClose }]
+        );
       }
-
-      Alert.alert(
-        'Báo cáo đã gửi',
-        'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
-        [{ text: 'OK', onPress: onClose }]
-      );
 
       // Reset form
       setSelectedReason('');
       setOtherReason('');
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể gửi báo cáo. Vui lòng thử lại sau.');
+      console.error('Error submitting report:', error);
+      const errorMessage = error.message || 'Không thể gửi báo cáo. Vui lòng thử lại sau.';
+      Alert.alert('Lỗi', errorMessage);
     } finally {
       setIsSubmitting(false);
     }
