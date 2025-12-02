@@ -14,6 +14,7 @@ import COLORS from '../../constant/colors';
 import SCREENS from '../../screens';
 import { useAuth } from '../../context/AuthContext';
 import UserService from '../../services/UserService';
+import LawyerService from '../../services/LawyerService';
 
 const ProfileSection = () => {
   const navigation = useNavigation();
@@ -42,6 +43,7 @@ const ProfileSection = () => {
 
   useEffect(() => {
     loadUserProfile();
+    checkLawyerApplicationStatus();
   }, [currentUser]);
 
   const loadUserProfile = async () => {
@@ -243,17 +245,42 @@ const ProfileSection = () => {
     );
   };
 
-  const handleLawyerRequest = (requestData) => {
-    // Update profile with pending status
-    setProfile(prev => ({
-      ...prev,
-      lawyerRequestStatus: 'pending'
-    }));
+  const checkLawyerApplicationStatus = async () => {
+    try {
+      const hasApplied = await LawyerService.hasUserApplied();
+      if (hasApplied) {
+        const application = await LawyerService.getUserApplication();
+        if (application && application.status) {
+          // Map backend status to frontend status
+          const statusMap = {
+            'PENDING': 'pending',
+            'APPROVED': 'approved',
+            'REJECTED': 'rejected'
+          };
+          setProfile(prev => ({
+            ...prev,
+            lawyerRequestStatus: statusMap[application.status] || 'pending'
+          }));
+        }
+      } else {
+        setProfile(prev => ({
+          ...prev,
+          lawyerRequestStatus: null
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking lawyer application status:', error);
+    }
+  };
 
+  const handleLawyerRequest = async (applicationData) => {
+    // Reload application status after submission
+    await checkLawyerApplicationStatus();
+    
     Toast.show({
       type: 'success',
-      text1: 'Gửi yêu cầu thành công',
-      text2: 'Yêu cầu của bạn đang được xét duyệt'
+      text1: 'Gửi đơn thành công',
+      text2: 'Đơn đăng ký của bạn đang được xét duyệt'
     });
   };
 
@@ -523,13 +550,13 @@ const ProfileSection = () => {
       {renderLawyerRequestStatus()}
 
       {/* Lawyer Request Button */}
-      {!profile.lawyerRequestStatus && (
+      {!profile.lawyerRequestStatus && currentUser?.role !== 'LAWYER' && (
         <Pressable 
           style={styles.lawyerRequestButton} 
           onPress={() => setShowLawyerRequestModal(true)}
         >
           <Ionicons name="briefcase-outline" size={20} color={COLORS.WHITE} />
-          <Text style={styles.lawyerRequestText}>Yêu cầu trở thành luật sư</Text>
+          <Text style={styles.lawyerRequestText}>Đăng ký trở thành luật sư</Text>
         </Pressable>
       )}
 
