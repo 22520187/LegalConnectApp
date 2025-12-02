@@ -1,11 +1,13 @@
 package com.example.legal_connect.controller;
 
 import com.example.legal_connect.dto.common.ApiResponse;
+import com.example.legal_connect.dto.user.UpdateProfileRequest;
 import com.example.legal_connect.dto.user.UserProfileDto;
 import com.example.legal_connect.dto.user.UserPostDto;
 import com.example.legal_connect.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,28 @@ public class UserController {
                     .build());
         } catch (RuntimeException e) {
             log.error("Error getting user profile: {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.<UserProfileDto>builder()
+                            .success(false)
+                            .message(e.getMessage())
+                            .build());
+        }
+    }
+
+    @PutMapping("/{userId}")
+    @Operation(summary = "Update user profile")
+    public ResponseEntity<ApiResponse<UserProfileDto>> updateProfile(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        try {
+            UserProfileDto updatedProfile = userService.updateProfile(userId, request);
+            return ResponseEntity.ok(ApiResponse.<UserProfileDto>builder()
+                    .success(true)
+                    .message("User profile updated successfully")
+                    .data(updatedProfile)
+                    .build());
+        } catch (RuntimeException e) {
+            log.error("Error updating user profile: {}", e.getMessage());
             return ResponseEntity.badRequest()
                     .body(ApiResponse.<UserProfileDto>builder()
                             .success(false)

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator
 import { Feather, Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import ProfileAvatar from './ProfileAvatar';
 import EditableSection from './EditableSection';
 import PasswordSection from './PasswordSection';
@@ -37,6 +38,7 @@ const ProfileSection = () => {
   });
 
   const [showLawyerRequestModal, setShowLawyerRequestModal] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -92,8 +94,29 @@ const ProfileSection = () => {
     }
   };
 
-  const updateProfile = (field, value) => {
+  const updateProfile = async (field, value) => {
     try {
+      if (!currentUser) {
+        Toast.show({
+          type: 'error',
+          text1: 'Lỗi',
+          text2: 'Vui lòng đăng nhập lại'
+        });
+        return;
+      }
+
+      const userId = currentUser.id || currentUser.userId;
+      if (!userId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Lỗi',
+          text2: 'Không tìm thấy thông tin người dùng'
+        });
+        return;
+      }
+
+      let updateData = {};
+
       if (field === 'name') {
         // Split the name into first name and last name
         const nameParts = value.trim().split(' ');
@@ -109,47 +132,49 @@ const ProfileSection = () => {
           return;
         }
 
-        // Update local state only (frontend-only)
-        setProfile(prev => ({
-          ...prev,
-          name: value,
-          first_name: firstName,
-          last_name: lastName
-        }));
-
-        Toast.show({
-          type: 'success',
-          text1: 'Cập nhật tên thành công'
-        });
+        updateData = { fullName: value };
       } else if (field === 'bio') {
-        // Update local state only (frontend-only)
-        setProfile(prev => ({
-          ...prev,
-          bio: value
-        }));
-
-        Toast.show({
-          type: 'success',
-          text1: 'Cập nhật tiểu sử thành công'
-        });
+        updateData = { bio: value };
       } else if (field === 'legalExpertise') {
-        // Update local state only (frontend-only)
-        setProfile(prev => ({
-          ...prev,
-          legalExpertise: value
-        }));
-
-        Toast.show({
-          type: 'success',
-          text1: 'Cập nhật chuyên môn pháp luật thành công'
-        });
+        updateData = { legalExpertise: value };
       } else {
-        // For other fields, just update the state
-        setProfile(prev => ({ ...prev, [field]: value }));
+        updateData = { [field]: value };
+      }
+
+      // Call API to update profile
+      const updatedProfile = await UserService.updateProfile(userId, updateData);
+
+      if (updatedProfile) {
+        // Update local state with response from API
+        if (field === 'name') {
+          const nameParts = value.trim().split(' ');
+          const lastName = nameParts.pop();
+          const firstName = nameParts.join(' ');
+          setProfile(prev => ({
+            ...prev,
+            name: updatedProfile.fullName || value,
+            first_name: firstName,
+            last_name: lastName,
+            bio: updatedProfile.bio || prev.bio,
+            legalExpertise: updatedProfile.legalExpertise || prev.legalExpertise,
+            phoneNumber: updatedProfile.phoneNumber || prev.phoneNumber,
+            avatar: updatedProfile.avatar || prev.avatar,
+          }));
+        } else {
+          setProfile(prev => ({
+            ...prev,
+            [field]: value,
+            bio: updatedProfile.bio !== undefined ? updatedProfile.bio : prev.bio,
+            legalExpertise: updatedProfile.legalExpertise !== undefined ? updatedProfile.legalExpertise : prev.legalExpertise,
+            phoneNumber: updatedProfile.phoneNumber !== undefined ? updatedProfile.phoneNumber : prev.phoneNumber,
+            avatar: updatedProfile.avatar !== undefined ? updatedProfile.avatar : prev.avatar,
+          }));
+        }
 
         Toast.show({
           type: 'success',
-          text1: `Cập nhật ${field} thành công`
+          text1: 'Cập nhật thành công',
+          text2: `Đã cập nhật ${field === 'name' ? 'tên' : field === 'bio' ? 'tiểu sử' : field === 'legalExpertise' ? 'chuyên môn' : field}`
         });
       }
     } catch (error) {
@@ -157,7 +182,7 @@ const ProfileSection = () => {
       Toast.show({
         type: 'error',
         text1: 'Không thể cập nhật thông tin',
-        text2: 'Vui lòng thử lại'
+        text2: error.response?.data?.message || 'Vui lòng thử lại'
       });
     }
   };
@@ -232,6 +257,119 @@ const ProfileSection = () => {
     });
   };
 
+  const handleAvatarPress = () => {
+    Alert.alert(
+      'Chọn ảnh đại diện',
+      'Bạn muốn chọn ảnh từ đâu?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Thư viện',
+          onPress: () => pickImage('library'),
+        },
+        {
+          text: 'Máy ảnh',
+          onPress: () => pickImage('camera'),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const pickImage = async (source) => {
+    try {
+      // Request permissions
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Quyền truy cập', 'Cần quyền truy cập máy ảnh để chụp ảnh.');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Quyền truy cập', 'Cần quyền truy cập thư viện ảnh để chọn ảnh.');
+          return;
+        }
+      }
+
+      // Pick image
+      const options = {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      };
+
+      let result;
+      if (source === 'camera') {
+        result = await ImagePicker.launchCameraAsync(options);
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync(options);
+      }
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        await uploadAvatarImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi',
+        text2: 'Không thể chọn ảnh. Vui lòng thử lại.'
+      });
+    }
+  };
+
+  const uploadAvatarImage = async (imageUri) => {
+    try {
+      setUploadingAvatar(true);
+
+      // Upload avatar
+      const avatarUrl = await UserService.uploadAvatar(imageUri);
+
+      if (!avatarUrl) {
+        throw new Error('Upload failed');
+      }
+
+      // Update profile with new avatar URL
+      const userId = currentUser.id || currentUser.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      const updatedProfile = await UserService.updateProfile(userId, {
+        avatar: avatarUrl
+      });
+
+      if (updatedProfile) {
+        // Update local state
+        setProfile(prev => ({
+          ...prev,
+          avatar: updatedProfile.avatar || avatarUrl
+        }));
+
+        Toast.show({
+          type: 'success',
+          text1: 'Thành công',
+          text2: 'Đã cập nhật ảnh đại diện'
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi',
+        text2: error.response?.data?.message || 'Không thể cập nhật ảnh đại diện. Vui lòng thử lại.'
+      });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const renderLawyerRequestStatus = () => {
     if (profile.lawyerRequestStatus === 'pending') {
       return (
@@ -301,7 +439,18 @@ const ProfileSection = () => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.profileInfo}>
-            <ProfileAvatar name={profile.name} size="lg" />
+            {uploadingAvatar ? (
+              <View style={styles.avatarLoadingContainer}>
+                <ActivityIndicator size="small" color={COLORS.BLUE} />
+              </View>
+            ) : (
+              <ProfileAvatar 
+                name={profile.name} 
+                image={profile.avatar}
+                size="lg"
+                onPress={handleAvatarPress}
+              />
+            )}
             <View style={styles.textContainer}>
               <Text style={styles.nameText}>{profile.name}</Text>
               <Text style={styles.infoText} numberOfLines={2}>
@@ -621,6 +770,17 @@ const styles = StyleSheet.create({
       fontSize: 16,
       fontWeight: '600',
       marginLeft: 8,
+    },
+    avatarPressable: {
+      position: 'relative',
+    },
+    avatarLoadingContainer: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: COLORS.GRAY_BG,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 

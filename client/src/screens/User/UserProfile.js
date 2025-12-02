@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,8 @@ import COLORS from '../../constant/colors';
 import ReportModal from '../../components/ReportModal/ReportModal';
 import { useAuth } from '../../context/AuthContext';
 import { getOrCreateConversation } from '../../services/MessageService';
+import UserService from '../../services/UserService';
+import Toast from 'react-native-toast-message';
 
 const UserProfile = () => {
   const navigation = useNavigation();
@@ -26,59 +29,103 @@ const UserProfile = () => {
   
   const [showReportModal, setShowReportModal] = useState(false);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Kiểm tra xem đây có phải profile của chính mình không
   const isOwnProfile = currentUser && currentUser.id === userId;
 
-  // Mock user profile data
-  const [userProfile] = useState({
+  // User profile data from API
+  const [userProfile, setUserProfile] = useState({
     id: userId,
-    name: userName,
-    avatar: userAvatar,
-    bio: 'Luật sư có 8 năm kinh nghiệm trong lĩnh vực tư vấn pháp luật dân sự, hình sự và lao động. Tốt nghiệp xuất sắc Đại học Luật Hà Nội, từng công tác tại nhiều văn phòng luật uy tín.',
-    legalExpertise: ['Luật Dân sự', 'Luật Hình sự', 'Luật Lao động', 'Luật Gia đình'],
-    location: 'Hà Nội, Việt Nam',
-    joinDate: new Date(2020, 5, 15),
+    name: userName || '',
+    avatar: userAvatar || null,
+    bio: '',
+    legalExpertise: [],
+    joinDate: null,
     stats: {
-      questionsAsked: 23,
-      answersGiven: 156,
-      bestAnswers: 89,
-      helpfulVotes: 1247,
-      reputation: 2580,
+      questionsAsked: 0,
+      answersGiven: 0,
+      bestAnswers: 0,
+      reputation: 0,
     },
-    isOnline: true,
-    lastSeen: new Date(),
-    verified: true,
+    role: '',
   });
 
-  // Mock recent activities
-  const [recentActivities] = useState([
-    {
-      id: 1,
-      type: 'answer',
-      title: 'Trả lời: "Quy định về hợp đồng thuê nhà"',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      votes: 15,
-    },
-    {
-      id: 2,
-      type: 'question',
-      title: 'Đặt câu hỏi: "Luật bảo vệ quyền lợi người tiêu dùng mới nhất"',
-      timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      votes: 8,
-    },
-    {
-      id: 3,
-      type: 'answer',
-      title: 'Trả lời: "Thủ tục ly hôn đơn phương"',
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      votes: 24,
-      isBestAnswer: true,
-    },
-  ]);
+  // Recent activities from user posts
+  const [recentActivities, setRecentActivities] = useState([]);
+
+  // Load user profile and posts
+  useEffect(() => {
+    loadUserProfile();
+  }, [userId]);
+
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      
+      // Load profile data
+      const profileData = await UserService.getUserProfile(userId);
+      
+      if (profileData) {
+        setUserProfile({
+          id: profileData.id,
+          name: profileData.fullName || userName || '',
+          avatar: profileData.avatar || userAvatar || null,
+          bio: profileData.bio || '',
+          legalExpertise: profileData.legalExpertise || [],
+          joinDate: profileData.joinedAt ? new Date(profileData.joinedAt) : null,
+          stats: {
+            questionsAsked: profileData.postCount || 0,
+            answersGiven: profileData.replyCount || 0,
+            bestAnswers: 0, // Backend chưa có field này
+            reputation: 0, // Backend chưa có field này
+          },
+          role: profileData.role || '',
+        });
+      }
+
+      // Load user posts for activities
+      const postsData = await UserService.getUserPosts(userId, {
+        page: 0,
+        size: 10,
+        sort: 'createdAt,desc'
+      });
+
+      if (postsData && postsData.content) {
+        // Convert posts to activities format
+        const activities = postsData.content.slice(0, 5).map(post => ({
+          id: post.id,
+          type: 'question',
+          title: post.title,
+          timestamp: post.createdAt ? new Date(post.createdAt) : new Date(),
+          votes: 0, // Backend chưa có vote count trong UserPostDto
+          isBestAnswer: post.solved || false,
+        }));
+        setRecentActivities(activities);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi tải thông tin',
+        text2: 'Không thể tải thông tin người dùng. Vui lòng thử lại.'
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadUserProfile();
+  };
 
   const formatJoinDate = (date) => {
-    return date.toLocaleDateString('vi-VN', { 
+    if (!date) return '';
+    const dateObj = date instanceof Date ? date : new Date(date);
+    return dateObj.toLocaleDateString('vi-VN', { 
       year: 'numeric', 
       month: 'long' 
     });
@@ -117,7 +164,7 @@ const UserProfile = () => {
         userId: userProfile.id,
         userName: userProfile.name,
         userAvatar: userProfile.avatar,
-        isOnline: userProfile.isOnline,
+        isOnline: false, // Backend chưa có field này
       });
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -207,58 +254,68 @@ const UserProfile = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            {userProfile.avatar ? (
-              <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
-            ) : (
-              <View style={styles.defaultAvatar}>
-                <Text style={styles.avatarText}>
-                  {userProfile.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.BLUE} />
+          <Text style={styles.loadingText}>Đang tải thông tin...</Text>
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[COLORS.BLUE]}
+            />
+          }
+        >
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              {userProfile.avatar ? (
+                <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
+              ) : (
+                <View style={styles.defaultAvatar}>
+                  <Text style={styles.avatarText}>
+                    {userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                </View>
+              )}
+              {userProfile.role === 'LAWYER' && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.BLUE} />
+                </View>
+              )}
+            </View>
+            
+            <Text style={styles.userName}>{userProfile.name || 'Người dùng'}</Text>
+            
+            {userProfile.joinDate && (
+              <Text style={styles.joinDate}>
+                Tham gia từ {formatJoinDate(userProfile.joinDate)}
+              </Text>
             )}
-            {userProfile.isOnline && <View style={styles.onlineIndicator} />}
-            {userProfile.verified && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={20} color={COLORS.BLUE} />
+            
+            {userProfile.bio && (
+              <Text style={styles.bio}>{userProfile.bio}</Text>
+            )}
+            
+            {/* Expertise Tags */}
+            {userProfile.legalExpertise && userProfile.legalExpertise.length > 0 && (
+              <View style={styles.expertiseSection}>
+                <Text style={styles.expertiseTitle}>Chuyên môn:</Text>
+                <View style={styles.expertiseTags}>
+                  {userProfile.legalExpertise.map((expertise, index) => (
+                    <View key={index} style={styles.expertiseTag}>
+                      <Text style={styles.expertiseText}>{expertise}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
           </View>
-          
-          <Text style={styles.userName}>{userProfile.name}</Text>
-          
-          {userProfile.location && (
-            <View style={styles.locationContainer}>
-              <Ionicons name="location-outline" size={16} color={COLORS.GRAY} />
-              <Text style={styles.location}>{userProfile.location}</Text>
-            </View>
-          )}
-          
-          <Text style={styles.joinDate}>
-            Tham gia từ {formatJoinDate(userProfile.joinDate)}
-          </Text>
-          
-          {userProfile.bio && (
-            <Text style={styles.bio}>{userProfile.bio}</Text>
-          )}
-          
-          {/* Expertise Tags */}
-          {userProfile.legalExpertise && userProfile.legalExpertise.length > 0 && (
-            <View style={styles.expertiseSection}>
-              <Text style={styles.expertiseTitle}>Chuyên môn:</Text>
-              <View style={styles.expertiseTags}>
-                {userProfile.legalExpertise.map((expertise, index) => (
-                  <View key={index} style={styles.expertiseTag}>
-                    <Text style={styles.expertiseText}>{expertise}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
 
         {/* Action Buttons */}
         {!isOwnProfile && (
@@ -291,12 +348,19 @@ const UserProfile = () => {
           </View>
         </View>
 
-        {/* Recent Activities */}
-        <View style={styles.activitiesSection}>
-          <Text style={styles.sectionTitle}>Hoạt động gần đây</Text>
-          {recentActivities.map(renderActivityItem)}
-        </View>
-      </ScrollView>
+          {/* Recent Activities */}
+          <View style={styles.activitiesSection}>
+            <Text style={styles.sectionTitle}>Hoạt động gần đây</Text>
+            {recentActivities.length > 0 ? (
+              recentActivities.map(renderActivityItem)
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Chưa có hoạt động nào</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      )}
 
       <ReportModal
         visible={showReportModal}
@@ -306,6 +370,7 @@ const UserProfile = () => {
         targetTitle={userProfile.name}
         onSubmit={handleReportSubmit}
       />
+      <Toast />
     </SafeAreaView>
   );
 };
@@ -569,6 +634,26 @@ const styles = StyleSheet.create({
     color: COLORS.GREEN,
     marginLeft: 2,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.GRAY,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.GRAY,
   },
 });
 

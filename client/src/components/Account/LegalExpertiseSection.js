@@ -1,25 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-
-const LEGAL_EXPERTISE_OPTIONS = [
-  'Luật Dân sự',
-  'Luật Hình sự', 
-  'Luật Lao động',
-  'Luật Kinh doanh',
-  'Luật Đất đai',
-  'Luật Gia đình',
-  'Luật Bảo hiểm',
-  'Luật Thuế',
-  'Luật Sở hữu trí tuệ',
-  'Luật Môi trường',
-  'Luật Hành chính',
-  'Luật Hiến pháp',
-  'Luật Quốc tế',
-  'Luật Tố tụng dân sự',
-  'Luật Tố tụng hình sự'
-];
+import ForumService from '../../services/ForumService';
 
 const LegalExpertiseSection = ({
   title,
@@ -30,6 +13,44 @@ const LegalExpertiseSection = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedExpertises, setSelectedExpertises] = useState(value);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Load categories when component expands
+  useEffect(() => {
+    if (isExpanded && categories.length === 0) {
+      loadCategories();
+    }
+  }, [isExpanded]);
+
+  // Update selectedExpertises when value prop changes
+  useEffect(() => {
+    setSelectedExpertises(value);
+  }, [value]);
+
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const categoriesData = await ForumService.getCategories();
+      if (categoriesData && Array.isArray(categoriesData)) {
+        // Extract category names and filter active ones
+        const categoryNames = categoriesData
+          .filter(cat => cat.isActive !== false)
+          .map(cat => cat.name)
+          .sort();
+        setCategories(categoryNames);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi tải danh mục',
+        text2: 'Không thể tải danh sách chuyên môn. Vui lòng thử lại.'
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   const handleToggleExpertise = (expertise) => {
     setSelectedExpertises(prev => {
@@ -62,28 +83,39 @@ const LegalExpertiseSection = ({
           {icon}
           <Text style={styles.title}>{title}</Text>
         </View>
-        <ScrollView style={styles.optionsContainer} nestedScrollEnabled>
-          {LEGAL_EXPERTISE_OPTIONS.map((expertise) => (
-            <Pressable
-              key={expertise}
-              style={[
-                styles.optionItem,
-                selectedExpertises.includes(expertise) && styles.selectedOption
-              ]}
-              onPress={() => handleToggleExpertise(expertise)}
-            >
-              <Text style={[
-                styles.optionText,
-                selectedExpertises.includes(expertise) && styles.selectedOptionText
-              ]}>
-                {expertise}
-              </Text>
-              {selectedExpertises.includes(expertise) && (
-                <Feather name="check" size={16} color="#007AFF" />
-              )}
-            </Pressable>
-          ))}
-        </ScrollView>
+        {loadingCategories ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text style={styles.loadingText}>Đang tải danh mục...</Text>
+          </View>
+        ) : categories.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Không có danh mục nào</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.optionsContainer} nestedScrollEnabled>
+            {categories.map((expertise) => (
+              <Pressable
+                key={expertise}
+                style={[
+                  styles.optionItem,
+                  selectedExpertises.includes(expertise) && styles.selectedOption
+                ]}
+                onPress={() => handleToggleExpertise(expertise)}
+              >
+                <Text style={[
+                  styles.optionText,
+                  selectedExpertises.includes(expertise) && styles.selectedOptionText
+                ]}>
+                  {expertise}
+                </Text>
+                {selectedExpertises.includes(expertise) && (
+                  <Feather name="check" size={16} color="#007AFF" />
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
         <View style={styles.buttonContainer}>
           <Pressable 
             style={[styles.button, styles.cancelButton]} 
@@ -95,6 +127,7 @@ const LegalExpertiseSection = ({
           <Pressable 
             style={[styles.button, styles.saveButton]} 
             onPress={handleSave}
+            disabled={loadingCategories}
           >
             <Feather name="check" size={16} color="#fff" />
             <Text style={[styles.buttonText, styles.saveButtonText]}>Lưu</Text>
@@ -230,6 +263,25 @@ const styles = StyleSheet.create({
   },
   valueTextLeft: {
     textAlign: 'left',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
   },
 });
 
