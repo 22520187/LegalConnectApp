@@ -25,6 +25,70 @@ export const getUserProfile = async (userId) => {
 }
 
 /**
+ * Update user profile
+ * @param {number} userId - User ID
+ * @param {Object} profileData - Profile data to update
+ * @param {string} profileData.fullName - Full name (optional)
+ * @param {string} profileData.bio - Bio (optional)
+ * @param {Array<string>} profileData.legalExpertise - Legal expertise list (optional)
+ * @param {string} profileData.phoneNumber - Phone number (optional)
+ * @param {string} profileData.avatar - Avatar URL (optional)
+ * @returns {Promise<Object>} Updated user profile data
+ */
+export const updateProfile = async (userId, profileData) => {
+    try {
+        const response = await apiClient.put(`/users/${userId}`, profileData);
+        if (response.status >= 200 && response.status < 300) {
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        throw error;
+    }
+};
+
+/**
+ * Upload avatar image
+ * @param {Object} imageUri - Image URI from ImagePicker
+ * @returns {Promise<string>} Uploaded avatar URL
+ */
+export const uploadAvatar = async (imageUri) => {
+    try {
+        const formData = new FormData();
+        formData.append('file', {
+            uri: imageUri,
+            type: 'image/jpeg',
+            name: 'avatar.jpg',
+        });
+
+        const response = await apiClient.post('/upload/avatar', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            throw new Error('Failed to upload avatar');
+        }
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+        throw error;
+    }
+};
+
+/**
  * Get user posts with pagination
  * @param {number} userId - User ID
  * @param {Object} options - Pagination options
@@ -61,6 +125,8 @@ export const getUserPosts = async (userId, options = {}) => {
 // Export default object with all methods
 const UserService = {
     getUserProfile,
+    updateProfile,
+    uploadAvatar,
     getUserPosts,
 };
 

@@ -5,11 +5,13 @@ const ProfileAvatar = ({
   name, 
   image, 
   style,
-  size = 'md'
+  size = 'md',
+  onPress
 }) => {
   const [isPressed, setIsPressed] = useState(false);
   
   const getInitials = (name) => {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -56,11 +58,13 @@ const ProfileAvatar = ({
   return (
     <Pressable 
       style={[styles.container, style]}
+      onPress={onPress}
       onPressIn={() => setIsPressed(true)}
       onPressOut={() => setIsPressed(false)}
+      disabled={!onPress}
     >
       {renderAvatar()}
-      {isPressed && (
+      {isPressed && onPress && (
         <View style={styles.overlay}>
           <Text style={styles.overlayText}>Change</Text>
         </View>
