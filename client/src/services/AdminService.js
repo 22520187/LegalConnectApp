@@ -453,6 +453,30 @@ export const rejectLawyerApplication = async (applicationId, adminNotes = null) 
     }
 };
 
+/**
+ * Lấy thống kê dashboard cho admin
+ * @returns {Promise<Object>} AdminDashboardStatsDto
+ */
+export const getDashboardStats = async () => {
+    try {
+        const response = await apiClient.get('/admin/dashboard/stats');
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<AdminDashboardStatsDto>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            throw new Error('Failed to fetch dashboard statistics');
+        }
+    } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        throw error;
+    }
+};
+
 // Export default object with all methods
 const AdminService = {
     getViolationPosts,
@@ -466,6 +490,7 @@ const AdminService = {
     getAllPosts,
     updatePostHotStatus,
     updatePostPinStatus,
+    getDashboardStats,
 };
 
 export default AdminService;

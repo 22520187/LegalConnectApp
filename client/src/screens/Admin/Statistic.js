@@ -6,7 +6,9 @@ import {
   StyleSheet, 
   Dimensions,
   TouchableOpacity,
-  Alert
+  Alert,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native'
 import { 
   LineChart, 
@@ -14,52 +16,229 @@ import {
   PieChart 
 } from 'react-native-gifted-charts'
 import { LinearGradient } from 'expo-linear-gradient'
+import { getDashboardStats } from '../../services/AdminService'
 
 const { width: screenWidth } = Dimensions.get('window')
 
 const Statistic = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('7days')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [statsData, setStatsData] = useState(null)
+  const [error, setError] = useState(null)
 
-  // Dữ liệu mẫu cho biểu đồ số bài viết theo ngày
-  const postsData = [
-    { value: 15, date: '1/10', label: 'T2' },
-    { value: 23, date: '2/10', label: 'T3' },
-    { value: 18, date: '3/10', label: 'T4' },
-    { value: 32, date: '4/10', label: 'T5' },
-    { value: 28, date: '5/10', label: 'T6' },
-    { value: 45, date: '6/10', label: 'T7' },
-    { value: 38, date: '7/10', label: 'CN' },
-  ]
+  // Fetch dữ liệu từ API
+  const fetchStats = async () => {
+    try {
+      setError(null)
+      const data = await getDashboardStats()
+      setStatsData(data)
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err)
+      setError(err.message || 'Không thể tải dữ liệu thống kê')
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu thống kê. Vui lòng thử lại.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
 
-  // Dữ liệu cho biểu đồ cột - Thống kê theo loại bài viết
-  const postTypeData = [
-    { value: 120, label: 'Hỏi đáp', frontColor: '#4A90E2' },
-    { value: 85, label: 'Tài liệu', frontColor: '#50C878' },
-    { value: 65, label: 'Thảo luận', frontColor: '#FFB347' },
-    { value: 45, label: 'Khác', frontColor: '#FF6B6B' },
-  ]
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
-  // Dữ liệu cho biểu đồ tròn - Phân bố người dùng
-  const userTypeData = [
-    { value: 45, color: '#4A90E2', text: '45%' },
-    { value: 30, color: '#50C878', text: '30%' },
-    { value: 25, color: '#FFB347', text: '25%' },
-  ]
+  const onRefresh = () => {
+    setRefreshing(true)
+    fetchStats()
+  }
 
-  const userTypeLabels = [
-    { color: '#4A90E2', label: 'Người dùng thường' },
-    { color: '#50C878', label: 'Luật sư' },
-    { color: '#FFB347', label: 'Quản trị viên' },
-  ]
+  // Format số với dấu phẩy
+  const formatNumber = (num) => {
+    return num?.toLocaleString('vi-VN') || '0'
+  }
 
-  // Dữ liệu tổng quan
-  const overviewStats = [
-    { title: 'Tổng bài viết', value: '1,234', change: '+12%', color: '#4A90E2' },
-    { title: 'Người dùng mới', value: '89', change: '+8%', color: '#50C878' },
-    { title: 'Luật sư', value: '156', change: '+5%', color: '#FFB347' },
-    { title: 'Tương tác', value: '2,567', change: '+15%', color: '#FF6B6B' },
-  ]
+  // Tính phần trăm thay đổi (so sánh tháng này với tháng trước)
+  const calculateChange = (current, previous) => {
+    if (!previous || previous === 0) return current > 0 ? '+100%' : '0%'
+    const change = ((current - previous) / previous) * 100
+    return change >= 0 ? `+${change.toFixed(0)}%` : `${change.toFixed(0)}%`
+  }
+
+  // Chuyển đổi dữ liệu weeklyActivity thành format cho LineChart
+  const getPostsData = () => {
+    if (!statsData?.weeklyActivity || statsData.weeklyActivity.length === 0) {
+      return []
+    }
+
+    const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+    return statsData.weeklyActivity.map((item, index) => {
+      const dayName = item.day || dayLabels[index] || `Ngày ${index + 1}`
+      return {
+        value: item.posts || 0,
+        label: dayName.substring(0, 2),
+        date: dayName
+      }
+    })
+  }
+
+  // Chuyển đổi dữ liệu usersByRole thành format cho PieChart
+  const getUserTypeData = () => {
+    if (!statsData?.usersByRole || statsData.usersByRole.length === 0) {
+      return { data: [], labels: [] }
+    }
+
+    const colors = ['#4A90E2', '#50C878', '#FFB347', '#FF6B6B', '#9B59B6']
+    const roleLabels = {
+      'USER': 'Người dùng thường',
+      'LAWYER': 'Luật sư',
+      'ADMIN': 'Quản trị viên'
+    }
+
+    const total = statsData.usersByRole.reduce((sum, item) => sum + (item.count || 0), 0)
+    
+    const data = statsData.usersByRole.map((item, index) => {
+      const percentage = total > 0 ? Math.round((item.count / total) * 100) : 0
+      return {
+        value: percentage,
+        color: colors[index % colors.length],
+        text: `${percentage}%`
+      }
+    })
+
+    const labels = statsData.usersByRole.map((item, index) => ({
+      color: colors[index % colors.length],
+      label: roleLabels[item.role] || item.role
+    }))
+
+    return { data, labels, total }
+  }
+
+  // Tính toán overview stats
+  const getOverviewStats = () => {
+    if (!statsData) return []
+
+    // Lấy dữ liệu tháng trước để tính phần trăm thay đổi
+    const monthlyGrowth = statsData.monthlyGrowth || []
+    const currentMonth = monthlyGrowth[monthlyGrowth.length - 1]
+    const previousMonth = monthlyGrowth[monthlyGrowth.length - 2]
+
+    return [
+      { 
+        title: 'Tổng bài viết', 
+        value: formatNumber(statsData.totalPosts), 
+        change: previousMonth && currentMonth ? calculateChange(currentMonth.posts, previousMonth.posts) : '0%',
+        color: '#4A90E2' 
+      },
+      { 
+        title: 'Người dùng mới', 
+        value: formatNumber(statsData.newUsersThisMonth), 
+        change: previousMonth && currentMonth ? calculateChange(currentMonth.users, previousMonth.users) : '0%',
+        color: '#50C878' 
+      },
+      { 
+        title: 'Luật sư', 
+        value: formatNumber(statsData.totalLawyers), 
+        change: previousMonth && currentMonth ? calculateChange(currentMonth.lawyers, previousMonth.lawyers) : '0%',
+        color: '#FFB347' 
+      },
+      { 
+        title: 'Tương tác', 
+        value: formatNumber(statsData.totalMessages || 0), 
+        change: '+0%',
+        color: '#FF6B6B' 
+      },
+    ]
+  }
+
+  // Chuyển đổi dữ liệu popularPosts thành format cho BarChart
+  const getPostTypeData = () => {
+    if (!statsData?.popularPosts || statsData.popularPosts.length === 0) {
+      return []
+    }
+
+    // Nhóm theo category và đếm
+    const categoryCount = {}
+    statsData.popularPosts.forEach(post => {
+      const category = post.categoryName || 'Khác'
+      categoryCount[category] = (categoryCount[category] || 0) + 1
+    })
+
+    const colors = ['#4A90E2', '#50C878', '#FFB347', '#FF6B6B']
+    return Object.entries(categoryCount).slice(0, 4).map(([label, count], index) => ({
+      value: count,
+      label: label.length > 8 ? label.substring(0, 8) : label,
+      frontColor: colors[index % colors.length]
+    }))
+  }
+
+  // Chuyển đổi recentActivities
+  const getRecentActivities = () => {
+    if (!statsData?.recentActivities || statsData.recentActivities.length === 0) {
+      return []
+    }
+
+    const activityIcons = {
+      'USER_REGISTERED': '👥',
+      'POST_CREATED': '📝',
+      'LAWYER_APPLIED': '⚖️',
+      'LAWYER_APPROVED': '✅',
+      'POST_REPORTED': '🚨'
+    }
+
+    const activityTitles = {
+      'USER_REGISTERED': 'Người dùng mới',
+      'POST_CREATED': 'Bài viết mới',
+      'LAWYER_APPLIED': 'Đơn xin luật sư',
+      'LAWYER_APPROVED': 'Luật sư được duyệt',
+      'POST_REPORTED': 'Bài viết bị báo cáo'
+    }
+
+    return statsData.recentActivities.slice(0, 10).map(activity => {
+      const timestamp = activity.timestamp ? new Date(activity.timestamp) : new Date()
+      const hoursAgo = Math.floor((Date.now() - timestamp.getTime()) / (1000 * 60 * 60))
+      
+      return {
+        icon: activityIcons[activity.type] || '📌',
+        title: activityTitles[activity.type] || activity.type,
+        description: activity.description || '',
+        time: hoursAgo < 1 ? 'Vừa xong' : `${hoursAgo}h`
+      }
+    })
+  }
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4A90E2" />
+        <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+      </View>
+    )
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchStats}>
+          <Text style={styles.retryButtonText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  if (!statsData) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>Không có dữ liệu</Text>
+      </View>
+    )
+  }
+
+  const postsData = getPostsData()
+  const { data: userTypeData, labels: userTypeLabels, total: totalUsers } = getUserTypeData()
+  const overviewStats = getOverviewStats()
+  const postTypeData = getPostTypeData()
+  const recentActivities = getRecentActivities()
 
   const periodOptions = [
     { key: '7days', label: '7 ngày' },
@@ -85,7 +264,13 @@ const Statistic = () => {
   )
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {/* Header */}
       <LinearGradient
         colors={['#4A90E2', '#357ABD']}
@@ -130,122 +315,126 @@ const Statistic = () => {
       </View>
 
       {/* Biểu đồ đường - Số bài viết theo ngày */}
-      <ChartContainer title="Số bài viết theo ngày">
-        <LineChart
-          data={postsData}
-          width={screenWidth - 60}
-          height={220}
-          color="#4A90E2"
-          thickness={3}
-          dataPointsColor="#4A90E2"
-          dataPointsRadius={6}
-          textColor="#666"
-          textFontSize={12}
-          areaChart
-          startFillColor="#4A90E2"
-          startOpacity={0.3}
-          endFillColor="#4A90E2"
-          endOpacity={0.1}
-          spacing={45}
-          backgroundColor="transparent"
-          rulesColor="#E0E0E0"
-          rulesType="solid"
-          initialSpacing={20}
-          yAxisColor="#E0E0E0"
-          xAxisColor="#E0E0E0"
-          showVerticalLines
-          verticalLinesColor="#F0F0F0"
-          xAxisThickness={1}
-          yAxisThickness={1}
-          yAxisTextStyle={{ color: '#666' }}
-          xAxisLabelTextStyle={{ color: '#666', textAlign: 'center' }}
-        />
+      <ChartContainer title="Số bài viết theo ngày (7 ngày qua)">
+        {postsData.length > 0 ? (
+          <LineChart
+            data={postsData}
+            width={screenWidth - 60}
+            height={220}
+            color="#4A90E2"
+            thickness={3}
+            dataPointsColor="#4A90E2"
+            dataPointsRadius={6}
+            textColor="#666"
+            textFontSize={12}
+            areaChart
+            startFillColor="#4A90E2"
+            startOpacity={0.3}
+            endFillColor="#4A90E2"
+            endOpacity={0.1}
+            spacing={45}
+            backgroundColor="transparent"
+            rulesColor="#E0E0E0"
+            rulesType="solid"
+            initialSpacing={20}
+            yAxisColor="#E0E0E0"
+            xAxisColor="#E0E0E0"
+            showVerticalLines
+            verticalLinesColor="#F0F0F0"
+            xAxisThickness={1}
+            yAxisThickness={1}
+            yAxisTextStyle={{ color: '#666' }}
+            xAxisLabelTextStyle={{ color: '#666', textAlign: 'center' }}
+          />
+        ) : (
+          <View style={styles.emptyChart}>
+            <Text style={styles.emptyChartText}>Chưa có dữ liệu</Text>
+          </View>
+        )}
       </ChartContainer>
 
       {/* Biểu đồ cột - Thống kê theo loại bài viết */}
-      <ChartContainer title="Phân loại bài viết">
-        <BarChart
-          data={postTypeData}
-          width={screenWidth - 60}
-          height={220}
-          barWidth={40}
-          spacing={25}
-          roundedTop
-          roundedBottom
-          hideRules
-          xAxisThickness={1}
-          yAxisThickness={1}
-          yAxisTextStyle={{ color: '#666' }}
-          noOfSections={4}
-          maxValue={150}
-          backgroundColor="transparent"
-          xAxisColor="#E0E0E0"
-          yAxisColor="#E0E0E0"
-          initialSpacing={20}
-        />
+      <ChartContainer title="Phân loại bài viết phổ biến">
+        {postTypeData.length > 0 ? (
+          <BarChart
+            data={postTypeData}
+            width={screenWidth - 60}
+            height={220}
+            barWidth={40}
+            spacing={25}
+            roundedTop
+            roundedBottom
+            hideRules
+            xAxisThickness={1}
+            yAxisThickness={1}
+            yAxisTextStyle={{ color: '#666' }}
+            noOfSections={4}
+            maxValue={Math.max(...postTypeData.map(d => d.value), 10)}
+            backgroundColor="transparent"
+            xAxisColor="#E0E0E0"
+            yAxisColor="#E0E0E0"
+            initialSpacing={20}
+          />
+        ) : (
+          <View style={styles.emptyChart}>
+            <Text style={styles.emptyChartText}>Chưa có dữ liệu</Text>
+          </View>
+        )}
       </ChartContainer>
 
       {/* Biểu đồ tròn - Phân bố người dùng */}
       <ChartContainer title="Phân bố người dùng">
-        <View style={styles.pieChartContainer}>
-          <PieChart
-            data={userTypeData}
-            radius={80}
-            innerRadius={30}
-            centerLabelComponent={() => (
-              <View style={styles.centerLabel}>
-                <Text style={styles.centerLabelText}>Tổng</Text>
-                <Text style={styles.centerLabelValue}>1,489</Text>
-              </View>
-            )}
-          />
-          <View style={styles.legendContainer}>
-            {userTypeLabels.map((item, index) => (
-              <View key={index} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: item.color }]} />
-                <Text style={styles.legendText}>{item.label}</Text>
-              </View>
-            ))}
+        {userTypeData.length > 0 ? (
+          <View style={styles.pieChartContainer}>
+            <PieChart
+              data={userTypeData}
+              radius={80}
+              innerRadius={30}
+              centerLabelComponent={() => (
+                <View style={styles.centerLabel}>
+                  <Text style={styles.centerLabelText}>Tổng</Text>
+                  <Text style={styles.centerLabelValue}>{formatNumber(totalUsers)}</Text>
+                </View>
+              )}
+            />
+            <View style={styles.legendContainer}>
+              {userTypeLabels.map((item, index) => (
+                <View key={index} style={styles.legendItem}>
+                  <View style={[styles.legendColor, { backgroundColor: item.color }]} />
+                  <Text style={styles.legendText}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.emptyChart}>
+            <Text style={styles.emptyChartText}>Chưa có dữ liệu</Text>
+          </View>
+        )}
       </ChartContainer>
 
       {/* Thống kê bổ sung */}
       <ChartContainer title="Hoạt động gần đây">
-        <View style={styles.activityList}>
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Text style={styles.activityIconText}>📝</Text>
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Bài viết mới</Text>
-              <Text style={styles.activityDesc}>23 bài viết được đăng hôm nay</Text>
-            </View>
-            <Text style={styles.activityTime}>2h</Text>
+        {recentActivities.length > 0 ? (
+          <View style={styles.activityList}>
+            {recentActivities.map((activity, index) => (
+              <View key={index} style={styles.activityItem}>
+                <View style={styles.activityIcon}>
+                  <Text style={styles.activityIconText}>{activity.icon}</Text>
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>{activity.title}</Text>
+                  <Text style={styles.activityDesc}>{activity.description}</Text>
+                </View>
+                <Text style={styles.activityTime}>{activity.time}</Text>
+              </View>
+            ))}
           </View>
-          
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Text style={styles.activityIconText}>👥</Text>
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Người dùng mới</Text>
-              <Text style={styles.activityDesc}>5 người dùng đăng ký mới</Text>
-            </View>
-            <Text style={styles.activityTime}>4h</Text>
+        ) : (
+          <View style={styles.emptyChart}>
+            <Text style={styles.emptyChartText}>Chưa có hoạt động nào</Text>
           </View>
-          
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Text style={styles.activityIconText}>⚖️</Text>
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Luật sư xác thực</Text>
-              <Text style={styles.activityDesc}>2 luật sư được xác thực</Text>
-            </View>
-            <Text style={styles.activityTime}>6h</Text>
-          </View>
-        </View>
+        )}
       </ChartContainer>
 
       <View style={styles.bottomPadding} />
@@ -433,6 +622,42 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 20,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyChart: {
+    height: 220,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyChartText: {
+    fontSize: 14,
+    color: '#999',
   },
 })
 
