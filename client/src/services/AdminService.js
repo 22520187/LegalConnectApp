@@ -113,11 +113,101 @@ export const updatePostStatus = async (postId, isActive) => {
     }
 };
 
+/**
+ * Lấy danh sách tất cả người dùng cho admin quản lý
+ * @param {Object} options - Query options
+ * @param {number} options.page - Số trang (default: 0)
+ * @param {number} options.size - Số lượng items mỗi trang (default: 10)
+ * @param {string} options.sortBy - Trường sắp xếp (default: "createdAt")
+ * @param {string} options.sortDir - Hướng sắp xếp "asc" hoặc "desc" (default: "desc")
+ * @param {string|null} options.search - Tìm kiếm theo từ khóa (optional)
+ * @param {string|null} options.role - Lọc theo role (optional)
+ * @returns {Promise<Object>} Page object với UserManagementDto (content, totalElements, totalPages, etc.)
+ */
+export const getAllUsers = async (options = {}) => {
+    try {
+        const {
+            page = 0,
+            size = 10,
+            sortBy = 'createdAt',
+            sortDir = 'desc',
+            search = null,
+            role = null
+        } = options;
+
+        const params = {
+            page,
+            size,
+            sortBy,
+            sortDir
+        };
+
+        if (search !== null && search.trim() !== '') {
+            params.search = search.trim();
+        }
+
+        if (role !== null && role.trim() !== '') {
+            params.role = role.trim();
+        }
+
+        const response = await apiClient.get('/admin/users', { params });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<Page<UserManagementDto>>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data || { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        }
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+    }
+};
+
+/**
+ * Cập nhật trạng thái enabled/disabled của người dùng
+ * @param {number} userId - ID của người dùng
+ * @param {boolean} isEnabled - Trạng thái enabled (true = enabled, false = disabled)
+ * @returns {Promise<Object>} Response từ API
+ */
+export const updateUserStatus = async (userId, isEnabled) => {
+    try {
+        const response = await apiClient.put(`/admin/users/${userId}/status`, null, {
+            params: { isEnabled }
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<String>
+            if (response.data.success) {
+                return response.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            const error = new Error('Failed to update user status');
+            error.response = response;
+            if (response.data && response.data.message) {
+                error.message = response.data.message;
+            }
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error updating user status:', error);
+        throw error;
+    }
+};
+
 // Export default object with all methods
 const AdminService = {
     getViolationPosts,
     getPostDetails,
     updatePostStatus,
+    getAllUsers,
+    updateUserStatus,
 };
 
 export default AdminService;
