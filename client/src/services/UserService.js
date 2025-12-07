@@ -25,6 +25,29 @@ export const getUserProfile = async (userId) => {
 }
 
 /**
+ * Get user profile by userId (using /users endpoint)
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} User profile data
+ */
+export const getUserProfileByUserId = async (userId) => {
+    try {
+        const response = await apiClient.get(`/users/${userId}`);
+        if (response.status >= 200 && response.status < 300) {
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        throw error;
+    }
+};
+
+/**
  * Update user profile
  * @param {number} userId - User ID
  * @param {Object} profileData - Profile data to update
@@ -125,6 +148,7 @@ export const getUserPosts = async (userId, options = {}) => {
 // Export default object with all methods
 const UserService = {
     getUserProfile,
+    getUserProfileByUserId,
     updateProfile,
     uploadAvatar,
     getUserPosts,

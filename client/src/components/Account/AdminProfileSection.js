@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -9,21 +9,55 @@ import PasswordSection from './PasswordSection';
 import COLORS from '../../constant/colors';
 import { useAuth } from '../../context/AuthContext';
 
-const AdminProfileSection = () => {
+const AdminProfileSection = ({ profileData, onRefresh }) => {
   const navigation = useNavigation();
   const { logout } = useAuth();
   
-  // Mock admin data for frontend-only version
-  const [profile, setProfile] = useState({
-    name: 'Admin System',
-    email: 'admin@legalconnect.com',
-    phone: '0123456789',
-    id: 1,
-    first_name: 'Admin',
-    last_name: 'System',
-    role: 'Administrator',
-    joinDate: '2024-01-01',
-  });
+  // Initialize profile from API data or use default values
+  const initializeProfile = (data) => {
+    if (!data) {
+      return {
+        name: 'Admin System',
+        email: '',
+        phone: '',
+        id: null,
+        first_name: '',
+        last_name: '',
+        role: 'Administrator',
+        joinDate: new Date().toISOString(),
+        avatar: null,
+      };
+    }
+
+    const nameParts = (data.fullName || '').trim().split(' ');
+    const lastName = nameParts.length > 0 ? nameParts.pop() : '';
+    const firstName = nameParts.join(' ');
+
+    return {
+      name: data.fullName || '',
+      email: data.email || '',
+      phone: data.phoneNumber || '',
+      id: data.id || null,
+      first_name: firstName,
+      last_name: lastName,
+      role: data.role || 'Administrator',
+      joinDate: data.joinedAt || new Date().toISOString(),
+      avatar: data.avatar || null,
+      postCount: data.postCount || 0,
+      replyCount: data.replyCount || 0,
+      bio: data.bio || '',
+      legalExpertise: data.legalExpertise || [],
+    };
+  };
+
+  const [profile, setProfile] = useState(initializeProfile(profileData));
+
+  // Update profile when profileData changes
+  useEffect(() => {
+    if (profileData) {
+      setProfile(initializeProfile(profileData));
+    }
+  }, [profileData]);
 
   const updateProfile = (field, value) => {
     try {
@@ -181,7 +215,7 @@ const AdminProfileSection = () => {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.profileInfo}>
-            <ProfileAvatar name={profile.name} size="lg" />
+            <ProfileAvatar name={profile.name} image={profile.avatar} size="lg" />
             <View style={styles.textContainer}>
               <Text style={styles.nameText}>{profile.name}</Text>
               <View style={styles.roleContainer}>
