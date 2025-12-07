@@ -81,6 +81,127 @@ export const getPostDetails = async (postId) => {
 };
 
 /**
+ * Lấy danh sách tất cả bài viết cho admin quản lý
+ * @param {Object} options - Query options
+ * @param {number} options.page - Số trang (default: 0)
+ * @param {number} options.size - Số lượng items mỗi trang (default: 10)
+ * @param {string} options.sortBy - Trường sắp xếp (default: "createdAt")
+ * @param {string} options.sortDir - Hướng sắp xếp "asc" hoặc "desc" (default: "desc")
+ * @param {string|null} options.search - Tìm kiếm theo từ khóa (optional)
+ * @param {boolean|null} options.isActive - Lọc theo trạng thái active (optional)
+ * @returns {Promise<Object>} Page object với PostModerationDto (content, totalElements, totalPages, etc.)
+ */
+export const getAllPosts = async (options = {}) => {
+    try {
+        const {
+            page = 0,
+            size = 10,
+            sortBy = 'createdAt',
+            sortDir = 'desc',
+            search = null,
+            isActive = null
+        } = options;
+
+        const params = {
+            page,
+            size,
+            sortBy,
+            sortDir
+        };
+
+        if (search !== null && search.trim() !== '') {
+            params.search = search.trim();
+        }
+
+        if (isActive !== null) {
+            params.isActive = isActive;
+        }
+
+        const response = await apiClient.get('/admin/posts', { params });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<Page<PostModerationDto>>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data || { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        }
+    } catch (error) {
+        console.error('Error fetching posts:', error);
+        throw error;
+    }
+};
+
+/**
+ * Cập nhật trạng thái hot của bài viết
+ * @param {number} postId - ID của bài viết
+ * @param {boolean} isHot - Trạng thái hot (true = hot, false = not hot)
+ * @returns {Promise<Object>} Response từ API
+ */
+export const updatePostHotStatus = async (postId, isHot) => {
+    try {
+        const response = await apiClient.put(`/admin/posts/${postId}/hot`, null, {
+            params: { isHot }
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<String>
+            if (response.data.success) {
+                return response.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            const error = new Error('Failed to update post hot status');
+            error.response = response;
+            if (response.data && response.data.message) {
+                error.message = response.data.message;
+            }
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error updating post hot status:', error);
+        throw error;
+    }
+};
+
+/**
+ * Cập nhật trạng thái pin của bài viết
+ * @param {number} postId - ID của bài viết
+ * @param {boolean} isPinned - Trạng thái pin (true = pinned, false = unpinned)
+ * @returns {Promise<Object>} Response từ API
+ */
+export const updatePostPinStatus = async (postId, isPinned) => {
+    try {
+        const response = await apiClient.put(`/admin/posts/${postId}/pin`, null, {
+            params: { isPinned }
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend trả về ApiResponse<String>
+            if (response.data.success) {
+                return response.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            const error = new Error('Failed to update post pin status');
+            error.response = response;
+            if (response.data && response.data.message) {
+                error.message = response.data.message;
+            }
+            throw error;
+        }
+    } catch (error) {
+        console.error('Error updating post pin status:', error);
+        throw error;
+    }
+};
+
+/**
  * Cập nhật trạng thái active/inactive của bài viết
  * @param {number} postId - ID của bài viết
  * @param {boolean} isActive - Trạng thái active (true = active, false = inactive/banned)
@@ -342,6 +463,9 @@ const AdminService = {
     getLawyerApplications,
     approveLawyerApplication,
     rejectLawyerApplication,
+    getAllPosts,
+    updatePostHotStatus,
+    updatePostPinStatus,
 };
 
 export default AdminService;

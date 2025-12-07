@@ -20,8 +20,9 @@ const { width } = Dimensions.get('window');
 
 const PostManagement = () => {
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('reports');
+  const [selectedTab, setSelectedTab] = useState('posts');
   const [reportedPosts, setReportedPosts] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showPostDetail, setShowPostDetail] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,11 +31,19 @@ const PostManagement = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
+  const [postsPage, setPostsPage] = useState(0);
+  const [postsTotalPages, setPostsTotalPages] = useState(0);
 
   useEffect(() => {
-    setPage(0);
-    setReportedPosts([]);
-    loadData(0, selectedTab === 'reports' ? true : false);
+    if (selectedTab === 'posts') {
+      setPostsPage(0);
+      setPosts([]);
+      loadPosts(0);
+    } else {
+      setPage(0);
+      setReportedPosts([]);
+      loadData(0, selectedTab === 'reports' ? true : false);
+    }
   }, [selectedTab]);
 
   // Load counts for both tabs on initial mount
@@ -132,15 +141,73 @@ const PostManagement = () => {
     }
   };
 
+  const loadPosts = async (pageNum = 0) => {
+    try {
+      setLoading(true);
+
+      const response = await AdminService.getAllPosts({
+        page: pageNum,
+        size: 20,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
+
+      if (response && response.content) {
+        // Map API response to UI format
+        const mappedPosts = response.content.map(post => ({
+          id: post.id,
+          title: post.title || 'Không có tiêu đề',
+          author: post.author?.fullName || post.author?.email || 'Không xác định',
+          content: post.content || '',
+          createdAt: post.createdAt || new Date().toISOString(),
+          categoryName: post.categoryName,
+          views: post.views || 0,
+          replyCount: post.replyCount || 0,
+          isHot: post.isHot || false,
+          pinned: post.pinned || false,
+          isActive: post.isActive !== undefined ? post.isActive : true,
+        }));
+
+        if (pageNum === 0) {
+          setPosts(mappedPosts);
+        } else {
+          setPosts(prev => [...prev, ...mappedPosts]);
+        }
+        
+        setPostsPage(response.number || 0);
+        setPostsTotalPages(response.totalPages || 0);
+        setTotalElements(response.totalElements || 0);
+      } else {
+        setPosts([]);
+      }
+    } catch (error) {
+      console.error('Error loading posts:', error);
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu. Vui lòng thử lại.');
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData(0, selectedTab === 'reports' ? true : false);
+    if (selectedTab === 'posts') {
+      await loadPosts(0);
+    } else {
+      await loadData(0, selectedTab === 'reports' ? true : false);
+    }
     setRefreshing(false);
   };
 
   const loadMore = () => {
-    if (!loading && page < totalPages - 1) {
-      loadData(page + 1, selectedTab === 'reports' ? true : false);
+    if (selectedTab === 'posts') {
+      if (!loading && postsPage < postsTotalPages - 1) {
+        loadPosts(postsPage + 1);
+      }
+    } else {
+      if (!loading && page < totalPages - 1) {
+        loadData(page + 1, selectedTab === 'reports' ? true : false);
+      }
     }
   };
 
@@ -223,6 +290,117 @@ const PostManagement = () => {
         }
       ]
     );
+  };
+
+  const handleHotAction = async (post) => {
+    const newHotStatus = !post.isHot;
+    Alert.alert(
+      'Xác nhận',
+      newHotStatus 
+        ? `Bạn có chắc muốn đánh dấu bài viết "${post.title}" là hot?`
+        : `Bạn có chắc muốn bỏ đánh dấu hot cho bài viết "${post.title}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: newHotStatus ? 'Đánh dấu hot' : 'Bỏ đánh dấu',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await AdminService.updatePostHotStatus(post.id, newHotStatus);
+              
+              Alert.alert(
+                'Thành công',
+                newHotStatus 
+                  ? 'Bài viết đã được đánh dấu hot'
+                  : 'Đã bỏ đánh dấu hot'
+              );
+              
+              // Update selected post immediately
+              if (selectedPost && selectedPost.id === post.id) {
+                setSelectedPost({ ...selectedPost, isHot: newHotStatus });
+              }
+              
+              // Reload data after action
+              setTimeout(() => {
+                loadPosts(0);
+              }, 500);
+            } catch (error) {
+              console.error('Error handling hot action:', error);
+              const errorMessage = error.response?.data?.message || error.message || 'Không thể thực hiện thao tác';
+              Alert.alert('Lỗi', errorMessage);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handlePinAction = async (post) => {
+    const newPinStatus = !post.pinned;
+    Alert.alert(
+      'Xác nhận',
+      newPinStatus 
+        ? `Bạn có chắc muốn ghim bài viết "${post.title}"?`
+        : `Bạn có chắc muốn bỏ ghim bài viết "${post.title}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: newPinStatus ? 'Ghim' : 'Bỏ ghim',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await AdminService.updatePostPinStatus(post.id, newPinStatus);
+              
+              Alert.alert(
+                'Thành công',
+                newPinStatus 
+                  ? 'Bài viết đã được ghim'
+                  : 'Đã bỏ ghim bài viết'
+              );
+              
+              // Update selected post immediately
+              if (selectedPost && selectedPost.id === post.id) {
+                setSelectedPost({ ...selectedPost, pinned: newPinStatus });
+              }
+              
+              // Reload data after action
+              setTimeout(() => {
+                loadPosts(0);
+              }, 500);
+            } catch (error) {
+              console.error('Error handling pin action:', error);
+              const errorMessage = error.response?.data?.message || error.message || 'Không thể thực hiện thao tác';
+              Alert.alert('Lỗi', errorMessage);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const loadPostDetail = async (postId) => {
+    try {
+      const postDetail = await AdminService.getPostDetails(postId);
+      if (postDetail) {
+        const mappedPost = {
+          id: postDetail.id,
+          title: postDetail.title || 'Không có tiêu đề',
+          author: postDetail.author?.fullName || postDetail.author?.email || 'Không xác định',
+          content: postDetail.content || '',
+          createdAt: postDetail.createdAt || new Date().toISOString(),
+          categoryName: postDetail.categoryName,
+          views: postDetail.views || 0,
+          replyCount: postDetail.replyCount || 0,
+          isHot: postDetail.isHot || false,
+          pinned: postDetail.pinned || false,
+          isActive: postDetail.isActive !== undefined ? postDetail.isActive : true,
+        };
+        setSelectedPost(mappedPost);
+      }
+    } catch (error) {
+      console.error('Error loading post detail:', error);
+      Alert.alert('Lỗi', 'Không thể tải chi tiết bài viết.');
+    }
   };
 
 
@@ -411,6 +589,102 @@ const PostManagement = () => {
     );
   };
 
+  const renderPost = (post) => (
+    <View key={post.id} style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <View style={styles.postInfo}>
+          <View style={styles.postTitleRow}>
+            <Text style={styles.postTitle} numberOfLines={2}>
+              {post.title}
+            </Text>
+            {post.pinned && (
+              <Ionicons name="pin" size={16} color={COLORS.BLUE} style={styles.pinIcon} />
+            )}
+            {post.isHot && (
+              <Ionicons name="flame" size={16} color={COLORS.RED} style={styles.hotIcon} />
+            )}
+          </View>
+          <Text style={styles.postAuthor}>Tác giả: {post.author}</Text>
+          <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.postContent} numberOfLines={3}>
+        {post.content}
+      </Text>
+
+      <View style={styles.postStats}>
+        <View style={styles.statItem}>
+          <Ionicons name="eye" size={14} color={COLORS.GRAY} />
+          <Text style={styles.statText}>{post.views || 0}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Ionicons name="chatbubble" size={14} color={COLORS.GRAY} />
+          <Text style={styles.statText}>{post.replyCount || 0}</Text>
+        </View>
+        {post.categoryName && (
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{post.categoryName}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.viewButton}
+          onPress={async () => {
+            await loadPostDetail(post.id);
+            setShowPostDetail(true);
+          }}
+        >
+          <Ionicons name="eye" size={16} color={COLORS.BLUE} />
+          <Text style={styles.viewButtonText}>Xem chi tiết</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.hotButton, post.isHot && styles.hotButtonActive]}
+          onPress={() => handleHotAction(post)}
+        >
+          <Ionicons name="flame" size={16} color={post.isHot ? COLORS.WHITE : COLORS.RED} />
+          <Text style={[styles.hotButtonText, post.isHot && styles.hotButtonTextActive]}>
+            {post.isHot ? 'Bỏ hot' : 'Đánh dấu hot'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.pinButton, post.pinned && styles.pinButtonActive]}
+          onPress={() => handlePinAction(post)}
+        >
+          <Ionicons name="pin" size={16} color={post.pinned ? COLORS.WHITE : COLORS.BLUE} />
+          <Text style={[styles.pinButtonText, post.pinned && styles.pinButtonTextActive]}>
+            {post.pinned ? 'Bỏ ghim' : 'Ghim'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderPosts = () => {
+    return (
+      <View style={styles.reportedPostsContainer}>
+        <Text style={styles.sectionTitle}>
+          Tất cả bài viết ({posts.length})
+        </Text>
+        
+        {posts.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-text" size={48} color={COLORS.GRAY} />
+            <Text style={styles.emptyStateText}>
+              Chưa có bài viết nào
+            </Text>
+          </View>
+        ) : (
+          posts.map(renderPost)
+        )}
+      </View>
+    );
+  };
+
   const renderPostDetailModal = () => (
     <Modal
       visible={showPostDetail}
@@ -432,7 +706,15 @@ const PostManagement = () => {
           
           {selectedPost && (
             <ScrollView style={styles.modalContent}>
-              <Text style={styles.modalPostTitle}>{selectedPost.title}</Text>
+              <View style={styles.modalTitleRow}>
+                <Text style={styles.modalPostTitle}>{selectedPost.title}</Text>
+                {selectedPost.pinned && (
+                  <Ionicons name="pin" size={18} color={COLORS.BLUE} style={styles.modalPinIcon} />
+                )}
+                {selectedPost.isHot && (
+                  <Ionicons name="flame" size={18} color={COLORS.RED} style={styles.modalHotIcon} />
+                )}
+              </View>
               <Text style={styles.modalPostAuthor}>
                 Tác giả: {selectedPost.author}
               </Text>
@@ -503,25 +785,69 @@ const PostManagement = () => {
           )}
           
           <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.modalDismissButton}
-              onPress={() => {
-                handlePostAction(selectedPost, 'dismiss');
-                setShowPostDetail(false);
-              }}
-            >
-              <Text style={styles.modalDismissButtonText}>Bỏ qua</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.modalBanButton}
-              onPress={() => {
-                handlePostAction(selectedPost, 'ban');
-                setShowPostDetail(false);
-              }}
-            >
-              <Text style={styles.modalBanButtonText}>Cấm bài viết</Text>
-            </TouchableOpacity>
+            {selectedTab === 'posts' ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.modalHotButton, selectedPost?.isHot && styles.modalHotButtonActive]}
+                  onPress={() => {
+                    handleHotAction(selectedPost);
+                  }}
+                >
+                  <Ionicons 
+                    name="flame" 
+                    size={16} 
+                    color={selectedPost?.isHot ? COLORS.WHITE : COLORS.RED} 
+                  />
+                  <Text style={[
+                    styles.modalHotButtonText,
+                    selectedPost?.isHot && styles.modalHotButtonTextActive
+                  ]}>
+                    {selectedPost?.isHot ? 'Bỏ hot' : 'Đánh dấu hot'}
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalPinButton, selectedPost?.pinned && styles.modalPinButtonActive]}
+                  onPress={() => {
+                    handlePinAction(selectedPost);
+                  }}
+                >
+                  <Ionicons 
+                    name="pin" 
+                    size={16} 
+                    color={selectedPost?.pinned ? COLORS.WHITE : COLORS.BLUE} 
+                  />
+                  <Text style={[
+                    styles.modalPinButtonText,
+                    selectedPost?.pinned && styles.modalPinButtonTextActive
+                  ]}>
+                    {selectedPost?.pinned ? 'Bỏ ghim' : 'Ghim'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.modalDismissButton}
+                  onPress={() => {
+                    handlePostAction(selectedPost, 'dismiss');
+                    setShowPostDetail(false);
+                  }}
+                >
+                  <Text style={styles.modalDismissButtonText}>Bỏ qua</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.modalBanButton}
+                  onPress={() => {
+                    handlePostAction(selectedPost, 'ban');
+                    setShowPostDetail(false);
+                  }}
+                >
+                  <Text style={styles.modalBanButtonText}>Cấm bài viết</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -535,6 +861,21 @@ const PostManagement = () => {
       </View>
 
       <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            selectedTab === 'posts' && styles.activeTab
+          ]}
+          onPress={() => setSelectedTab('posts')}
+        >
+          <Text style={[
+            styles.tabText,
+            selectedTab === 'posts' && styles.activeTabText
+          ]}>
+            Bài viết
+          </Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity
           style={[
             styles.tab,
@@ -566,7 +907,7 @@ const PostManagement = () => {
         </TouchableOpacity>
       </View>
 
-      {loading && page === 0 ? (
+      {loading && ((selectedTab === 'posts' && postsPage === 0) || (selectedTab !== 'posts' && page === 0)) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.BLUE} />
           <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
@@ -589,8 +930,12 @@ const PostManagement = () => {
           }}
           scrollEventThrottle={400}
         >
-          {selectedTab === 'reports' ? renderReportedPosts() : renderProcessedPosts()}
-          {loading && page > 0 && (
+          {selectedTab === 'posts' 
+            ? renderPosts() 
+            : selectedTab === 'reports' 
+            ? renderReportedPosts() 
+            : renderProcessedPosts()}
+          {loading && ((selectedTab === 'posts' && postsPage > 0) || (selectedTab !== 'posts' && page > 0)) && (
             <View style={styles.loadMoreContainer}>
               <ActivityIndicator size="small" color={COLORS.BLUE} />
               <Text style={styles.loadMoreText}>Đang tải thêm...</Text>
@@ -1005,6 +1350,169 @@ const styles = StyleSheet.create({
     color: COLORS.WHITE,
     fontSize: 14,
     fontWeight: '600',
+  },
+  
+  // Posts tab styles
+  postCard: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  postTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  pinIcon: {
+    marginLeft: 8,
+  },
+  hotIcon: {
+    marginLeft: 4,
+  },
+  postStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  statText: {
+    fontSize: 12,
+    color: COLORS.GRAY_DARK,
+    marginLeft: 4,
+  },
+  categoryBadge: {
+    backgroundColor: COLORS.BLUE_LIGHT,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryText: {
+    fontSize: 11,
+    color: COLORS.BLUE,
+    fontWeight: '500',
+  },
+  hotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.RED_LIGHT || '#FFE5E5',
+    borderRadius: 6,
+    flex: 1,
+    marginRight: 6,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.RED,
+  },
+  hotButtonActive: {
+    backgroundColor: COLORS.RED,
+    borderColor: COLORS.RED,
+  },
+  hotButtonText: {
+    color: COLORS.RED,
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  hotButtonTextActive: {
+    color: COLORS.WHITE,
+  },
+  pinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.BLUE_LIGHT,
+    borderRadius: 6,
+    flex: 1,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.BLUE,
+  },
+  pinButtonActive: {
+    backgroundColor: COLORS.BLUE,
+    borderColor: COLORS.BLUE,
+  },
+  pinButtonText: {
+    color: COLORS.BLUE,
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  pinButtonTextActive: {
+    color: COLORS.WHITE,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalPinIcon: {
+    marginLeft: 8,
+  },
+  modalHotIcon: {
+    marginLeft: 4,
+  },
+  modalHotButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: COLORS.RED_LIGHT || '#FFE5E5',
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: COLORS.RED,
+  },
+  modalHotButtonActive: {
+    backgroundColor: COLORS.RED,
+    borderColor: COLORS.RED,
+  },
+  modalHotButtonText: {
+    color: COLORS.RED,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  modalHotButtonTextActive: {
+    color: COLORS.WHITE,
+  },
+  modalPinButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: COLORS.BLUE_LIGHT,
+    borderRadius: 8,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: COLORS.BLUE,
+  },
+  modalPinButtonActive: {
+    backgroundColor: COLORS.BLUE,
+    borderColor: COLORS.BLUE,
+  },
+  modalPinButtonText: {
+    color: COLORS.BLUE,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  modalPinButtonTextActive: {
+    color: COLORS.WHITE,
   },
 });
 
