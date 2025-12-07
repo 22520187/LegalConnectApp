@@ -10,10 +10,12 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import AdminService from '../../services/AdminService';
 
 const LawyerManagement = () => {
   const [activeTab, setActiveTab] = useState('lawyers');
@@ -27,191 +29,176 @@ const LawyerManagement = () => {
   const [actionReason, setActionReason] = useState('');
   const [showApplicationDetail, setShowApplicationDetail] = useState(false);
 
-  // Mock data for lawyers
   useEffect(() => {
-    loadLawyers();
-    loadPendingApplications();
-    loadProcessedApplications();
+    loadData();
   }, []);
 
-  const loadLawyers = () => {
-    // Mock API call - Danh sách luật sư đã được phê duyệt
-    const mockLawyers = [
-      {
-        id: 1,
-        name: 'Luật sư Nguyễn Văn An',
-        email: 'nguyen.van.an@lawfirm.com',
-        phone: '0901234567',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Dân sự, Luật Hợp đồng',
-        experience: '8 năm kinh nghiệm',
-        education: 'Thạc sĩ Luật - Đại học Luật Hà Nội',
-        joinDate: '2023-01-15',
-        status: 'active',
-        casesHandled: 45,
-        rating: 4.8,
-        verified: true,
-      },
-      {
-        id: 2,
-        name: 'Luật sư Trần Thị Bình',
-        email: 'tran.thi.binh@lawfirm.com',
-        phone: '0912345678',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Lao động, Luật Bảo hiểm xã hội',
-        experience: '12 năm kinh nghiệm',
-        education: 'Tiến sĩ Luật - Đại học Luật TP.HCM',
-        joinDate: '2022-08-20',
-        status: 'active',
-        casesHandled: 78,
-        rating: 4.9,
-        verified: true,
-      },
-      {
-        id: 3,
-        name: 'Luật sư Lê Văn Cường',
-        email: 'le.van.cuong@lawfirm.com',
-        phone: '0923456789',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Hình sự, Luật Tố tụng hình sự',
-        experience: '15 năm kinh nghiệm',
-        education: 'Thạc sĩ Luật - Học viện Tư pháp',
-        joinDate: '2021-12-10',
-        status: 'active',
-        casesHandled: 92,
-        rating: 4.7,
-        verified: true,
-      },
-      {
-        id: 4,
-        name: 'Luật sư Phạm Thị Dung',
-        email: 'pham.thi.dung@lawfirm.com',
-        phone: '0934567890',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Doanh nghiệp, Luật Đầu tư',
-        experience: '10 năm kinh nghiệm',
-        education: 'Thạc sĩ Luật - Đại học Kinh tế Quốc dân',
-        joinDate: '2023-03-05',
-        status: 'suspended',
-        casesHandled: 34,
-        rating: 4.5,
-        verified: true,
-      },
-    ];
-    setLawyers(mockLawyers);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadLawyers(),
+        loadPendingApplications(),
+        loadProcessedApplications(),
+      ]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadPendingApplications = () => {
-    // Mock API call - Đơn xin trở thành luật sư chờ phê duyệt
-    const mockPendingApplications = [
-      {
-        id: 5,
-        name: 'Hoàng Văn Em',
-        email: 'hoang.van.em@gmail.com',
-        phone: '0945678901',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Bất động sản, Luật Xây dựng',
-        experience: '5 năm kinh nghiệm',
-        education: 'Cử nhân Luật - Đại học Luật Hà Nội',
-        applicationDate: '2024-09-25',
-        status: 'pending',
-        documents: {
-          lawyerCertificate: 'certificate.pdf',
-          idCard: 'id_card.pdf',
-          cv: 'cv.pdf',
-        },
-        additionalInfo: 'Tôi có 5 năm kinh nghiệm làm việc tại văn phòng luật sư ABC. Chuyên về các vụ việc liên quan đến bất động sản và xây dựng.',
-      },
-      {
-        id: 6,
-        name: 'Vũ Thị Phương',
-        email: 'vu.thi.phuong@gmail.com',
-        phone: '0956789012',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Gia đình, Luật Hôn nhân',
-        experience: '3 năm kinh nghiệm',
-        education: 'Thạc sĩ Luật - Đại học Luật TP.HCM',
-        applicationDate: '2024-09-28',
-        status: 'pending',
-        documents: {
-          lawyerCertificate: 'certificate.pdf',
-          idCard: 'id_card.pdf',
-          cv: 'cv.pdf',
-        },
-        additionalInfo: 'Tôi chuyên về luật gia đình và có kinh nghiệm tư vấn cho nhiều gia đình về các vấn đề hôn nhân, ly hôn, và quyền nuôi con.',
-      },
-      {
-        id: 7,
-        name: 'Đỗ Văn Giang',
-        email: 'do.van.giang@gmail.com',
-        phone: '0967890123',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Thuế, Luật Tài chính',
-        experience: '7 năm kinh nghiệm',
-        education: 'Thạc sĩ Luật - Đại học Kinh tế Quốc dân',
-        applicationDate: '2024-09-30',
-        status: 'pending',
-        documents: {
-          lawyerCertificate: 'certificate.pdf',
-          idCard: 'id_card.pdf',
-          cv: 'cv.pdf',
-        },
-        additionalInfo: 'Có 7 năm kinh nghiệm trong lĩnh vực tư vấn thuế và tài chính cho các doanh nghiệp vừa và nhỏ.',
-      },
-    ];
-    setPendingApplications(mockPendingApplications);
+  const loadLawyers = async () => {
+    try {
+      const [applicationsResponse, usersResponse] = await Promise.all([
+        AdminService.getLawyerApplications({
+          status: 'APPROVED',
+          page: 0,
+          size: 100,
+          sortBy: 'reviewedAt',
+          sortDir: 'desc',
+        }),
+        AdminService.getAllUsers({
+          role: 'LAWYER',
+          page: 0,
+          size: 100,
+          sortBy: 'createdAt',
+          sortDir: 'desc',
+        }),
+      ]);
+
+      const userStatusMap = new Map();
+      usersResponse.content.forEach(user => {
+        userStatusMap.set(user.id, user.isEnabled);
+      });
+
+      const lawyersData = applicationsResponse.content.map(app => ({
+        id: app.user?.id,
+        name: app.user?.fullName || 'Chưa có tên',
+        email: app.user?.email || '',
+        phone: app.phoneNumber || 'Chưa có số điện thoại',
+        avatar: app.user?.avatar || 'https://via.placeholder.com/50',
+        specialization: app.specializations?.join(', ') || 'Chưa có thông tin',
+        experience: app.yearsOfExperience ? `${app.yearsOfExperience} năm kinh nghiệm` : 'Chưa có thông tin',
+        education: app.lawSchool ? `${app.lawSchool}${app.graduationYear ? ` (${app.graduationYear})` : ''}` : 'Chưa có thông tin',
+        joinDate: app.reviewedAt ? new Date(app.reviewedAt).toISOString().split('T')[0] : (app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : ''),
+        status: userStatusMap.get(app.user?.id) !== undefined 
+          ? (userStatusMap.get(app.user?.id) ? 'active' : 'suspended')
+          : 'active',
+        casesHandled: 0,
+        rating: 0,
+        verified: true,
+      }));
+      setLawyers(lawyersData);
+    } catch (error) {
+      console.error('Error loading lawyers:', error);
+      setLawyers([]);
+    }
   };
 
-  const loadProcessedApplications = () => {
-    // Mock API call - Đơn xin đã được xử lý
-    const mockProcessedApplications = [
-      {
-        id: 8,
-        name: 'Lý Văn Hùng',
-        email: 'ly.van.hung@gmail.com',
-        phone: '0978901234',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Hành chính, Luật Đất đai',
-        experience: '6 năm kinh nghiệm',
-        education: 'Cử nhân Luật - Học viện Hành chính Quốc gia',
-        applicationDate: '2024-09-15',
+  const loadPendingApplications = async () => {
+    try {
+      const response = await AdminService.getLawyerApplications({
+        status: 'PENDING',
+        page: 0,
+        size: 100,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+      });
+      const applications = response.content.map(app => ({
+        id: app.id,
+        name: app.user?.fullName || 'Chưa có tên',
+        email: app.user?.email || '',
+        phone: app.phoneNumber || 'Chưa có số điện thoại',
+        avatar: app.user?.avatar || 'https://via.placeholder.com/50',
+        specialization: app.specializations?.join(', ') || 'Chưa có thông tin',
+        experience: app.yearsOfExperience ? `${app.yearsOfExperience} năm kinh nghiệm` : 'Chưa có thông tin',
+        education: app.lawSchool ? `${app.lawSchool}${app.graduationYear ? ` (${app.graduationYear})` : ''}` : 'Chưa có thông tin',
+        applicationDate: app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : '',
+        status: 'pending',
+        documents: {
+          documentUrls: app.documentUrls || [],
+        },
+        additionalInfo: app.bio || 'Không có thông tin bổ sung',
+        licenseNumber: app.licenseNumber,
+        currentFirm: app.currentFirm,
+        officeAddress: app.officeAddress,
+      }));
+      setPendingApplications(applications);
+    } catch (error) {
+      console.error('Error loading pending applications:', error);
+      setPendingApplications([]);
+    }
+  };
+
+  const loadProcessedApplications = async () => {
+    try {
+      const [approvedResponse, rejectedResponse] = await Promise.all([
+        AdminService.getLawyerApplications({
+          status: 'APPROVED',
+          page: 0,
+          size: 100,
+          sortBy: 'reviewedAt',
+          sortDir: 'desc',
+        }),
+        AdminService.getLawyerApplications({
+          status: 'REJECTED',
+          page: 0,
+          size: 100,
+          sortBy: 'reviewedAt',
+          sortDir: 'desc',
+        }),
+      ]);
+      
+      const approved = approvedResponse.content.map(app => ({
+        id: app.id,
+        name: app.user?.fullName || 'Chưa có tên',
+        email: app.user?.email || '',
+        phone: app.phoneNumber || 'Chưa có số điện thoại',
+        avatar: app.user?.avatar || 'https://via.placeholder.com/50',
+        specialization: app.specializations?.join(', ') || 'Chưa có thông tin',
+        experience: app.yearsOfExperience ? `${app.yearsOfExperience} năm kinh nghiệm` : 'Chưa có thông tin',
+        education: app.lawSchool ? `${app.lawSchool}${app.graduationYear ? ` (${app.graduationYear})` : ''}` : 'Chưa có thông tin',
+        applicationDate: app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : '',
         status: 'approved',
         processedBy: 'Admin',
-        processedDate: '2024-09-20',
-        processedReason: 'Đủ điều kiện và kinh nghiệm phù hợp',
+        processedDate: app.reviewedAt ? new Date(app.reviewedAt).toISOString().split('T')[0] : '',
+        processedReason: app.adminNotes || 'Đơn xin đã được phê duyệt',
         documents: {
-          lawyerCertificate: 'certificate.pdf',
-          idCard: 'id_card.pdf',
-          cv: 'cv.pdf',
+          documentUrls: app.documentUrls || [],
         },
-        additionalInfo: 'Có kinh nghiệm tư vấn về luật hành chính và đất đai.',
-      },
-      {
-        id: 9,
-        name: 'Phạm Thị Mai',
-        email: 'pham.thi.mai@gmail.com',
-        phone: '0989012345',
-        avatar: 'https://via.placeholder.com/50',
-        specialization: 'Luật Sở hữu trí tuệ',
-        experience: '2 năm kinh nghiệm',
-        education: 'Cử nhân Luật - Đại học Luật Hà Nội',
-        applicationDate: '2024-09-10',
+        additionalInfo: app.bio || 'Không có thông tin bổ sung',
+      }));
+
+      const rejected = rejectedResponse.content.map(app => ({
+        id: app.id,
+        name: app.user?.fullName || 'Chưa có tên',
+        email: app.user?.email || '',
+        phone: app.phoneNumber || 'Chưa có số điện thoại',
+        avatar: app.user?.avatar || 'https://via.placeholder.com/50',
+        specialization: app.specializations?.join(', ') || 'Chưa có thông tin',
+        experience: app.yearsOfExperience ? `${app.yearsOfExperience} năm kinh nghiệm` : 'Chưa có thông tin',
+        education: app.lawSchool ? `${app.lawSchool}${app.graduationYear ? ` (${app.graduationYear})` : ''}` : 'Chưa có thông tin',
+        applicationDate: app.createdAt ? new Date(app.createdAt).toISOString().split('T')[0] : '',
         status: 'rejected',
         processedBy: 'Admin',
-        processedDate: '2024-09-18',
-        processedReason: 'Chưa đủ kinh nghiệm thực tế, cần thêm ít nhất 3 năm kinh nghiệm',
+        processedDate: app.reviewedAt ? new Date(app.reviewedAt).toISOString().split('T')[0] : '',
+        processedReason: app.adminNotes || 'Đơn xin đã bị từ chối',
         documents: {
-          lawyerCertificate: 'certificate.pdf',
-          idCard: 'id_card.pdf',
-          cv: 'cv.pdf',
+          documentUrls: app.documentUrls || [],
         },
-        additionalInfo: 'Mới tốt nghiệp và có 2 năm kinh nghiệm thực tập.',
-      },
-    ];
-    setProcessedApplications(mockProcessedApplications);
+        additionalInfo: app.bio || 'Không có thông tin bổ sung',
+      }));
+
+      setProcessedApplications([...approved, ...rejected]);
+    } catch (error) {
+      console.error('Error loading processed applications:', error);
+      setProcessedApplications([]);
+    }
   };
 
-  const handleLawyerAction = (lawyer, action) => {
+  const handleLawyerAction = async (lawyer, action) => {
     Alert.alert(
       'Xác nhận',
       `Bạn có chắc chắn muốn ${action === 'suspend' ? 'tạm khóa' : 'kích hoạt'} luật sư ${lawyer.name}?`,
@@ -219,12 +206,23 @@ const LawyerManagement = () => {
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Xác nhận',
-          onPress: () => {
-            const newStatus = action === 'suspend' ? 'suspended' : 'active';
-            setLawyers(prev => prev.map(l => 
-              l.id === lawyer.id ? { ...l, status: newStatus } : l
-            ));
-            Alert.alert('Thành công', `Đã ${action === 'suspend' ? 'tạm khóa' : 'kích hoạt'} luật sư ${lawyer.name}`);
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const isEnabled = action === 'activate';
+              await AdminService.updateUserStatus(lawyer.id, isEnabled);
+              
+              const newStatus = action === 'suspend' ? 'suspended' : 'active';
+              setLawyers(prev => prev.map(l => 
+                l.id === lawyer.id ? { ...l, status: newStatus } : l
+              ));
+              Alert.alert('Thành công', `Đã ${action === 'suspend' ? 'tạm khóa' : 'kích hoạt'} luật sư ${lawyer.name}`);
+            } catch (error) {
+              console.error('Error updating lawyer status:', error);
+              Alert.alert('Lỗi', 'Không thể cập nhật trạng thái luật sư. Vui lòng thử lại.');
+            } finally {
+              setLoading(false);
+            }
           }
         }
       ]
@@ -237,46 +235,43 @@ const LawyerManagement = () => {
     setShowActionModal(true);
   };
 
-  const confirmApplicationAction = () => {
+  const confirmApplicationAction = async () => {
     if (!selectedApplication || !selectedAction) return;
 
-    const processedApplication = {
-      ...selectedApplication,
-      status: selectedAction,
-      processedBy: 'Admin',
-      processedDate: new Date().toISOString().split('T')[0],
-      processedReason: actionReason || `Đơn xin đã được ${selectedAction === 'approved' ? 'phê duyệt' : 'từ chối'}`,
-    };
-
-    // Nếu phê duyệt, thêm vào danh sách luật sư
-    if (selectedAction === 'approved') {
-      const newLawyer = {
-        id: Date.now(),
-        name: `Luật sư ${selectedApplication.name}`,
-        email: selectedApplication.email,
-        phone: selectedApplication.phone,
-        avatar: selectedApplication.avatar,
-        specialization: selectedApplication.specialization,
-        experience: selectedApplication.experience,
-        education: selectedApplication.education,
-        joinDate: new Date().toISOString().split('T')[0],
-        status: 'active',
-        casesHandled: 0,
-        rating: 0,
-        verified: true,
-      };
-      setLawyers(prev => [newLawyer, ...prev]);
+    // Require reason for rejection
+    if (selectedAction === 'rejected' && !actionReason.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập lý do từ chối');
+      return;
     }
 
-    // Cập nhật state
-    setPendingApplications(prev => prev.filter(item => item.id !== selectedApplication.id));
-    setProcessedApplications(prev => [processedApplication, ...prev]);
+    try {
+      setLoading(true);
+      
+      if (selectedAction === 'approved') {
+        await AdminService.approveLawyerApplication(selectedApplication.id, actionReason || null);
+      } else {
+        await AdminService.rejectLawyerApplication(selectedApplication.id, actionReason || null);
+      }
 
-    Alert.alert('Thành công', `Đơn xin của ${selectedApplication.name} đã được ${selectedAction === 'approved' ? 'phê duyệt' : 'từ chối'}`);
-    setShowActionModal(false);
-    setSelectedApplication(null);
-    setSelectedAction(null);
-    setActionReason('');
+      // Reload data after action
+      await Promise.all([
+        loadLawyers(),
+        loadPendingApplications(),
+        loadProcessedApplications(),
+      ]);
+
+      Alert.alert('Thành công', `Đơn xin của ${selectedApplication.name} đã được ${selectedAction === 'approved' ? 'phê duyệt' : 'từ chối'}`);
+      setShowActionModal(false);
+      setSelectedApplication(null);
+      setSelectedAction(null);
+      setActionReason('');
+    } catch (error) {
+      console.error('Error processing application:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể xử lý đơn xin. Vui lòng thử lại.';
+      Alert.alert('Lỗi', errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderLawyerItem = ({ item }) => (
@@ -363,9 +358,13 @@ const LawyerManagement = () => {
         <View style={styles.documentsSection}>
           <Text style={styles.documentsTitle}>Tài liệu đính kèm:</Text>
           <View style={styles.documentsList}>
-            <Text style={styles.documentItem}>• Chứng chỉ hành nghề luật sư</Text>
-            <Text style={styles.documentItem}>• CMND/CCCD</Text>
-            <Text style={styles.documentItem}>• Sơ yếu lý lịch</Text>
+            {item.documents?.documentUrls && item.documents.documentUrls.length > 0 ? (
+              item.documents.documentUrls.map((url, index) => (
+                <Text key={index} style={styles.documentItem}>• {url}</Text>
+              ))
+            ) : (
+              <Text style={styles.documentItem}>• Không có tài liệu đính kèm</Text>
+            )}
           </View>
         </View>
       </View>
@@ -492,13 +491,21 @@ const LawyerManagement = () => {
       </View>
 
       <View style={styles.content}>
-        {activeTab === 'lawyers' ? (
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.BLUE} />
+            <Text style={styles.loadingText}>Đang tải...</Text>
+          </View>
+        )}
+        {!loading && activeTab === 'lawyers' ? (
           <FlatList
             data={lawyers}
             renderItem={renderLawyerItem}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
+            refreshing={loading}
+            onRefresh={loadLawyers}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="people" size={64} color={COLORS.GRAY} />
@@ -506,13 +513,15 @@ const LawyerManagement = () => {
               </View>
             }
           />
-        ) : activeTab === 'pending' ? (
+        ) : !loading && activeTab === 'pending' ? (
           <FlatList
             data={pendingApplications}
             renderItem={renderPendingApplicationItem}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
+            refreshing={loading}
+            onRefresh={loadPendingApplications}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="checkmark-circle" size={64} color={COLORS.GREEN} />
@@ -520,13 +529,15 @@ const LawyerManagement = () => {
               </View>
             }
           />
-        ) : (
+        ) : !loading ? (
           <FlatList
             data={processedApplications}
             renderItem={renderProcessedApplicationItem}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContainer}
+            refreshing={loading}
+            onRefresh={loadProcessedApplications}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="document-text" size={64} color={COLORS.GRAY} />
@@ -534,7 +545,7 @@ const LawyerManagement = () => {
               </View>
             }
           />
-        )}
+        ) : null}
       </View>
 
       {/* Action Modal */}
@@ -555,7 +566,7 @@ const LawyerManagement = () => {
             
             <TextInput
               style={styles.reasonInput}
-              placeholder={selectedAction === 'approved' ? 'Nhập lý do phê duyệt (tùy chọn)' : 'Nhập lý do từ chối'}
+              placeholder={selectedAction === 'approved' ? 'Nhập lý do phê duyệt (tùy chọn)' : 'Nhập lý do từ chối (bắt buộc)'}
               value={actionReason}
               onChangeText={setActionReason}
               multiline
@@ -564,13 +575,21 @@ const LawyerManagement = () => {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setShowActionModal(false)}
+                onPress={() => {
+                  setShowActionModal(false);
+                  setActionReason('');
+                }}
               >
                 <Text style={styles.cancelBtnText}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, selectedAction === 'approved' ? styles.approveBtn : styles.rejectBtn]}
+                style={[
+                  styles.modalBtn, 
+                  selectedAction === 'approved' ? styles.approveBtn : styles.rejectBtn,
+                  selectedAction === 'rejected' && !actionReason.trim() && styles.disabledBtn
+                ]}
                 onPress={confirmApplicationAction}
+                disabled={selectedAction === 'rejected' && !actionReason.trim()}
               >
                 <Text style={[styles.confirmBtnText, { color: COLORS.WHITE }]}>
                   {selectedAction === 'approved' ? 'Phê duyệt' : 'Từ chối'}
@@ -632,11 +651,36 @@ const LawyerManagement = () => {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Tài liệu đính kèm</Text>
                   <View style={styles.documentsList}>
-                    <Text style={styles.documentItem}>• Chứng chỉ hành nghề luật sư</Text>
-                    <Text style={styles.documentItem}>• CMND/CCCD</Text>
-                    <Text style={styles.documentItem}>• Sơ yếu lý lịch</Text>
+                    {selectedApplication.documents?.documentUrls && selectedApplication.documents.documentUrls.length > 0 ? (
+                      selectedApplication.documents.documentUrls.map((url, index) => (
+                        <Text key={index} style={styles.documentItem}>• {url}</Text>
+                      ))
+                    ) : (
+                      <Text style={styles.documentItem}>• Không có tài liệu đính kèm</Text>
+                    )}
                   </View>
                 </View>
+                
+                {selectedApplication.licenseNumber && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Số chứng chỉ hành nghề</Text>
+                    <Text style={styles.detailSectionContent}>{selectedApplication.licenseNumber}</Text>
+                  </View>
+                )}
+                
+                {selectedApplication.currentFirm && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Văn phòng luật sư hiện tại</Text>
+                    <Text style={styles.detailSectionContent}>{selectedApplication.currentFirm}</Text>
+                  </View>
+                )}
+                
+                {selectedApplication.officeAddress && (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Địa chỉ văn phòng</Text>
+                    <Text style={styles.detailSectionContent}>{selectedApplication.officeAddress}</Text>
+                  </View>
+                )}
                 
                 {selectedApplication.status !== 'pending' && (
                   <View style={styles.detailSection}>
@@ -761,6 +805,17 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     marginTop: 16,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: COLORS.GRAY,
+    marginTop: 12,
   },
 
   // Lawyer Card Styles
@@ -1133,6 +1188,9 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     color: COLORS.WHITE,
     fontWeight: '600',
+  },
+  disabledBtn: {
+    opacity: 0.5,
   },
 
   // Detail Modal Styles
