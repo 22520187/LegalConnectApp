@@ -9,10 +9,12 @@ import {
   RefreshControl,
   Modal,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import AdminService from '../../services/AdminService';
 
 const { width } = Dimensions.get('window');
 
@@ -22,68 +24,124 @@ const PostManagement = () => {
   const [reportedPosts, setReportedPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [showPostDetail, setShowPostDetail] = useState(false);
-
-  // Mock data - trong thực tế sẽ fetch từ API
-
-  const mockReportedPosts = [
-    {
-      id: 1,
-      title: "Hợp đồng thuê nhà có hiệu lực bao lâu?",
-      author: "Nguyễn Văn A",
-      reportCount: 3,
-      reports: [
-        { reason: "Nội dung không phù hợp", reportedBy: "User123", timestamp: "2024-01-15T10:30:00Z" },
-        { reason: "Thông tin sai lệch", reportedBy: "User456", timestamp: "2024-01-15T11:45:00Z" },
-        { reason: "Spam hoặc quảng cáo", reportedBy: "User789", timestamp: "2024-01-15T14:20:00Z" }
-      ],
-      content: "Tôi vừa ký hợp đồng thuê nhà với chủ nhà, nhưng không rõ thời hạn hiệu lực. Xin hỏi hợp đồng thuê nhà thường có hiệu lực trong bao lâu?",
-      createdAt: "2024-01-14T08:00:00Z",
-      status: "pending", // pending, reviewed, banned, dismissed
-    },
-    {
-      id: 2,
-      title: "Cách xử lý tranh chấp lao động",
-      author: "Trần Thị B",
-      reportCount: 2,
-      reports: [
-        { reason: "Ngôn từ độc hại", reportedBy: "User321", timestamp: "2024-01-15T09:15:00Z" },
-        { reason: "Vi phạm quy tắc cộng đồng", reportedBy: "User654", timestamp: "2024-01-15T13:30:00Z" }
-      ],
-      content: "Công ty tôi đang có tranh chấp về việc chấm dứt hợp đồng lao động. Tôi cần tư vấn về quy trình xử lý.",
-      createdAt: "2024-01-13T14:30:00Z",
-      status: "pending",
-    },
-    {
-      id: 3,
-      title: "Quyền lợi của người tiêu dùng khi mua hàng online",
-      author: "Lê Văn C",
-      reportCount: 1,
-      reports: [
-        { reason: "Thông tin sai lệch", reportedBy: "User987", timestamp: "2024-01-15T16:45:00Z" }
-      ],
-      content: "Tôi mua hàng online nhưng nhận được sản phẩm không đúng mô tả. Xin hỏi tôi có quyền lợi gì?",
-      createdAt: "2024-01-12T11:20:00Z",
-      status: "pending",
-    }
-  ];
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [processedCount, setProcessedCount] = useState(0);
 
   useEffect(() => {
-    loadData();
+    setPage(0);
+    setReportedPosts([]);
+    loadData(0, selectedTab === 'reports' ? true : false);
+  }, [selectedTab]);
+
+  // Load counts for both tabs on initial mount
+  useEffect(() => {
+    const loadInitialCounts = async () => {
+      try {
+        // Load pending count (isActive = true)
+        const pendingResponse = await AdminService.getViolationPosts({
+          page: 0,
+          size: 1,
+          isActive: true,
+        });
+        if (pendingResponse && pendingResponse.totalElements !== undefined) {
+          setPendingCount(pendingResponse.totalElements);
+        }
+
+        // Load processed count (isActive = false)
+        const processedResponse = await AdminService.getViolationPosts({
+          page: 0,
+          size: 1,
+          isActive: false,
+        });
+        if (processedResponse && processedResponse.totalElements !== undefined) {
+          setProcessedCount(processedResponse.totalElements);
+        }
+      } catch (error) {
+        console.error('Error loading initial counts:', error);
+      }
+    };
+
+    loadInitialCounts();
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (pageNum = 0, isActive = null) => {
     try {
-      // Simulate API calls
-      setReportedPosts(mockReportedPosts);
+      setLoading(true);
+
+      const activeFilter = selectedTab === 'reports' ? true : false;
+      
+      const response = await AdminService.getViolationPosts({
+        page: pageNum,
+        size: 20,
+        sortBy: 'createdAt',
+        sortDir: 'desc',
+        isActive: activeFilter,
+      });
+
+      if (response && response.content) {
+        // Map API response to UI format
+        const mappedPosts = response.content.map(post => ({
+          id: post.id,
+          title: post.title || 'Không có tiêu đề',
+          author: post.author?.fullName || post.author?.email || 'Không xác định',
+          reportCount: post.reportCount || 0,
+          reports: (post.reportReasons || []).map((reason, index) => ({
+            reason: reason || 'Không có lý do',
+            reportedBy: `User${index + 1}`,
+            timestamp: post.createdAt || new Date().toISOString(),
+          })),
+          content: post.content || '',
+          createdAt: post.createdAt || new Date().toISOString(),
+          status: post.isActive ? 'pending' : 'banned', // Map isActive to status
+          categoryName: post.categoryName,
+          views: post.views || 0,
+          replyCount: post.replyCount || 0,
+          violationReason: post.violationReason,
+          isReported: post.isReported,
+        }));
+
+        if (pageNum === 0) {
+          setReportedPosts(mappedPosts);
+        } else {
+          setReportedPosts(prev => [...prev, ...mappedPosts]);
+        }
+        
+        setPage(response.number || 0);
+        setTotalPages(response.totalPages || 0);
+        setTotalElements(response.totalElements || 0);
+        
+        // Update counts based on active filter
+        if (activeFilter) {
+          setPendingCount(response.totalElements || 0);
+        } else {
+          setProcessedCount(response.totalElements || 0);
+        }
+      } else {
+        setReportedPosts([]);
+      }
     } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tải dữ liệu');
+      console.error('Error loading violation posts:', error);
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu. Vui lòng thử lại.');
+      setReportedPosts([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadData(0, selectedTab === 'reports' ? true : false);
     setRefreshing(false);
+  };
+
+  const loadMore = () => {
+    if (!loading && page < totalPages - 1) {
+      loadData(page + 1, selectedTab === 'reports' ? true : false);
+    }
   };
 
   const formatTimeAgo = (timestamp) => {
@@ -99,7 +157,7 @@ const PostManagement = () => {
     }
   };
 
-  const handlePostAction = (post, action) => {
+  const handlePostAction = async (post, action) => {
     Alert.alert(
       'Xác nhận',
       action === 'ban' 
@@ -110,21 +168,57 @@ const PostManagement = () => {
         {
           text: action === 'ban' ? 'Cấm' : 'Bỏ qua',
           style: action === 'ban' ? 'destructive' : 'default',
-          onPress: () => {
-            // Update post status
-            const updatedPosts = reportedPosts.map(p => 
-              p.id === post.id 
-                ? { ...p, status: action === 'ban' ? 'banned' : 'dismissed' }
-                : p
-            );
-            setReportedPosts(updatedPosts);
-            
-            Alert.alert(
-              'Thành công',
-              action === 'ban' 
-                ? 'Bài viết đã được cấm'
-                : 'Đã bỏ qua các báo cáo'
-            );
+          onPress: async () => {
+            try {
+              // Gọi API để cập nhật trạng thái bài viết
+              // Ban = set isActive = false (bài viết bị vô hiệu hóa)
+              // Dismiss = giữ nguyên isActive = true (bài viết vẫn hoạt động)
+              const isActive = action === 'ban' ? false : true;
+              
+              await AdminService.updatePostStatus(post.id, isActive);
+              
+              Alert.alert(
+                'Thành công',
+                action === 'ban' 
+                  ? 'Bài viết đã được cấm'
+                  : 'Đã bỏ qua các báo cáo'
+              );
+              
+              // Reload counts for both tabs
+              const reloadCounts = async () => {
+                try {
+                  const pendingResponse = await AdminService.getViolationPosts({
+                    page: 0,
+                    size: 1,
+                    isActive: true,
+                  });
+                  if (pendingResponse && pendingResponse.totalElements !== undefined) {
+                    setPendingCount(pendingResponse.totalElements);
+                  }
+
+                  const processedResponse = await AdminService.getViolationPosts({
+                    page: 0,
+                    size: 1,
+                    isActive: false,
+                  });
+                  if (processedResponse && processedResponse.totalElements !== undefined) {
+                    setProcessedCount(processedResponse.totalElements);
+                  }
+                } catch (error) {
+                  console.error('Error reloading counts:', error);
+                }
+              };
+
+              // Reload data after action
+              setTimeout(() => {
+                loadData(0, selectedTab === 'reports' ? true : false);
+                reloadCounts();
+              }, 500);
+            } catch (error) {
+              console.error('Error handling post action:', error);
+              const errorMessage = error.response?.data?.message || error.message || 'Không thể thực hiện thao tác';
+              Alert.alert('Lỗi', errorMessage);
+            }
           }
         }
       ]
@@ -153,19 +247,27 @@ const PostManagement = () => {
         {post.content}
       </Text>
 
-      <View style={styles.reportsSection}>
-        <Text style={styles.reportsTitle}>Lý do báo cáo:</Text>
-        {post.reports.slice(0, 2).map((report, index) => (
-          <Text key={index} style={styles.reportReason}>
-            • {report.reason} (bởi {report.reportedBy})
-          </Text>
-        ))}
-        {post.reportCount > 2 && (
-          <Text style={styles.moreReports}>
-            +{post.reportCount - 2} báo cáo khác
-          </Text>
-        )}
-      </View>
+      {post.reportCount > 0 && (
+        <View style={styles.reportsSection}>
+          <Text style={styles.reportsTitle}>Lý do báo cáo ({post.reportCount}):</Text>
+          {post.reports && post.reports.length > 0 ? (
+            <>
+              {post.reports.slice(0, 2).map((report, index) => (
+                <Text key={index} style={styles.reportReason}>
+                  • {report.reason}
+                </Text>
+              ))}
+              {post.reportCount > 2 && (
+                <Text style={styles.moreReports}>
+                  +{post.reportCount - 2} báo cáo khác
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.reportReason}>Không có thông tin chi tiết</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.actionButtons}>
         <TouchableOpacity
@@ -199,15 +301,13 @@ const PostManagement = () => {
   );
 
   const renderReportedPosts = () => {
-    const pendingPosts = reportedPosts.filter(post => post.status === 'pending');
-    
     return (
       <View style={styles.reportedPostsContainer}>
         <Text style={styles.sectionTitle}>
-          Bài viết bị báo cáo ({pendingPosts.length})
+          Bài viết bị báo cáo ({reportedPosts.length})
         </Text>
         
-        {pendingPosts.length === 0 ? (
+        {reportedPosts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle" size={48} color={COLORS.GREEN} />
             <Text style={styles.emptyStateText}>
@@ -215,7 +315,7 @@ const PostManagement = () => {
             </Text>
           </View>
         ) : (
-          pendingPosts.map(renderReportedPost)
+          reportedPosts.map(renderReportedPost)
         )}
       </View>
     );
@@ -251,21 +351,29 @@ const PostManagement = () => {
         {post.content}
       </Text>
 
-      <View style={styles.reportsSection}>
-        <Text style={styles.reportsTitle}>
-          Đã xử lý {post.reportCount} báo cáo:
-        </Text>
-        {post.reports.slice(0, 2).map((report, index) => (
-          <Text key={index} style={styles.reportReason}>
-            • {report.reason} (bởi {report.reportedBy})
+      {post.reportCount > 0 && (
+        <View style={styles.reportsSection}>
+          <Text style={styles.reportsTitle}>
+            Đã xử lý {post.reportCount} báo cáo:
           </Text>
-        ))}
-        {post.reportCount > 2 && (
-          <Text style={styles.moreReports}>
-            +{post.reportCount - 2} báo cáo khác
-          </Text>
-        )}
-      </View>
+          {post.reports && post.reports.length > 0 ? (
+            <>
+              {post.reports.slice(0, 2).map((report, index) => (
+                <Text key={index} style={styles.reportReason}>
+                  • {report.reason}
+                </Text>
+              ))}
+              {post.reportCount > 2 && (
+                <Text style={styles.moreReports}>
+                  +{post.reportCount - 2} báo cáo khác
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.reportReason}>Không có thông tin chi tiết</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.actionButtons}>
         <TouchableOpacity
@@ -283,17 +391,13 @@ const PostManagement = () => {
   );
 
   const renderProcessedPosts = () => {
-    const processedPosts = reportedPosts.filter(post => 
-      post.status === 'banned' || post.status === 'dismissed'
-    );
-    
     return (
       <View style={styles.reportedPostsContainer}>
         <Text style={styles.sectionTitle}>
-          Bài viết đã xử lý ({processedPosts.length})
+          Bài viết đã xử lý ({reportedPosts.length})
         </Text>
         
-        {processedPosts.length === 0 ? (
+        {reportedPosts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="document-text" size={48} color={COLORS.GRAY} />
             <Text style={styles.emptyStateText}>
@@ -301,7 +405,7 @@ const PostManagement = () => {
             </Text>
           </View>
         ) : (
-          processedPosts.map(renderProcessedPost)
+          reportedPosts.map(renderProcessedPost)
         )}
       </View>
     );
@@ -338,21 +442,63 @@ const PostManagement = () => {
               
               <Text style={styles.modalPostContent}>{selectedPost.content}</Text>
               
-              <Text style={styles.modalReportsTitle}>
-                Tất cả báo cáo ({selectedPost.reportCount}):
-              </Text>
-              
-              {selectedPost.reports.map((report, index) => (
-                <View key={index} style={styles.modalReportItem}>
-                  <Text style={styles.modalReportReason}>{report.reason}</Text>
-                  <Text style={styles.modalReportBy}>
-                    Báo cáo bởi: {report.reportedBy}
-                  </Text>
-                  <Text style={styles.modalReportTime}>
-                    {formatTimeAgo(report.timestamp)}
+              {selectedPost.categoryName && (
+                <View style={styles.modalCategory}>
+                  <Text style={styles.modalCategoryText}>
+                    Danh mục: {selectedPost.categoryName}
                   </Text>
                 </View>
-              ))}
+              )}
+              
+              <View style={styles.modalStats}>
+                <Text style={styles.modalStatText}>
+                  Lượt xem: {selectedPost.views || 0}
+                </Text>
+                <Text style={styles.modalStatText}>
+                  Trả lời: {selectedPost.replyCount || 0}
+                </Text>
+              </View>
+              
+              {selectedPost.reportCount > 0 && (
+                <>
+                  <Text style={styles.modalReportsTitle}>
+                    Tất cả báo cáo ({selectedPost.reportCount}):
+                  </Text>
+                  
+                  {selectedPost.reports && selectedPost.reports.length > 0 ? (
+                    selectedPost.reports.map((report, index) => (
+                      <View key={index} style={styles.modalReportItem}>
+                        <Text style={styles.modalReportReason}>{report.reason}</Text>
+                        {report.reportedBy && (
+                          <Text style={styles.modalReportBy}>
+                            Báo cáo bởi: {report.reportedBy}
+                          </Text>
+                        )}
+                        {report.timestamp && (
+                          <Text style={styles.modalReportTime}>
+                            {formatTimeAgo(report.timestamp)}
+                          </Text>
+                        )}
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.modalReportReason}>
+                      Không có thông tin chi tiết về báo cáo
+                    </Text>
+                  )}
+                </>
+              )}
+              
+              {selectedPost.violationReason && (
+                <View style={styles.modalViolationReason}>
+                  <Text style={styles.modalViolationReasonTitle}>
+                    Lý do vi phạm (Admin):
+                  </Text>
+                  <Text style={styles.modalViolationReasonText}>
+                    {selectedPost.violationReason}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
           )}
           
@@ -400,7 +546,7 @@ const PostManagement = () => {
             styles.tabText,
             selectedTab === 'reports' && styles.activeTabText
           ]}>
-            Báo cáo ({reportedPosts.filter(p => p.status === 'pending').length})
+            Báo cáo
           </Text>
         </TouchableOpacity>
         
@@ -415,19 +561,43 @@ const PostManagement = () => {
             styles.tabText,
             selectedTab === 'processed' && styles.activeTabText
           ]}>
-            Đã xử lý ({reportedPosts.filter(p => p.status === 'banned' || p.status === 'dismissed').length})
+            Đã xử lý
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {selectedTab === 'reports' ? renderReportedPosts() : renderProcessedPosts()}
-      </ScrollView>
+      {loading && page === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.BLUE} />
+          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.content}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const paddingToBottom = 20;
+            if (
+              layoutMeasurement.height + contentOffset.y >=
+              contentSize.height - paddingToBottom
+            ) {
+              loadMore();
+            }
+          }}
+          scrollEventThrottle={400}
+        >
+          {selectedTab === 'reports' ? renderReportedPosts() : renderProcessedPosts()}
+          {loading && page > 0 && (
+            <View style={styles.loadMoreContainer}>
+              <ActivityIndicator size="small" color={COLORS.BLUE} />
+              <Text style={styles.loadMoreText}>Đang tải thêm...</Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       {renderPostDetailModal()}
     </SafeAreaView>
@@ -658,6 +828,26 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     marginTop: 16,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.GRAY,
+  },
+  loadMoreContainer: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.GRAY,
+  },
   
   // Modal styles
   modalOverlay: {
@@ -715,6 +905,30 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
+  modalCategory: {
+    backgroundColor: COLORS.GRAY_BG,
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  modalCategoryText: {
+    fontSize: 12,
+    color: COLORS.GRAY_DARK,
+    fontWeight: '500',
+  },
+  modalStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: COLORS.GRAY_LIGHT,
+  },
+  modalStatText: {
+    fontSize: 12,
+    color: COLORS.GRAY_DARK,
+  },
   modalReportsTitle: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -741,6 +955,24 @@ const styles = StyleSheet.create({
   modalReportTime: {
     fontSize: 11,
     color: COLORS.GRAY,
+  },
+  modalViolationReason: {
+    backgroundColor: COLORS.RED_LIGHT || '#FFE5E5',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  modalViolationReasonTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.RED,
+    marginBottom: 4,
+  },
+  modalViolationReasonText: {
+    fontSize: 12,
+    color: COLORS.BLACK,
+    lineHeight: 18,
   },
   modalActions: {
     flexDirection: 'row',
