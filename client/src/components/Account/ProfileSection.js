@@ -10,6 +10,7 @@ import PasswordSection from './PasswordSection';
 import BioSection from './BioSection';
 import LegalExpertiseSection from './LegalExpertiseSection';
 import LawyerRequestModal from '../LawyerRequestModal/LawyerRequestModal';
+import LawyerApplicationDetailModal from '../LawyerApplicationDetailModal/LawyerApplicationDetailModal';
 import COLORS from '../../constant/colors';
 import SCREENS from '../../screens';
 import { useAuth } from '../../context/AuthContext';
@@ -39,6 +40,8 @@ const ProfileSection = () => {
   });
 
   const [showLawyerRequestModal, setShowLawyerRequestModal] = useState(false);
+  const [showApplicationDetailModal, setShowApplicationDetailModal] = useState(false);
+  const [applicationId, setApplicationId] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
@@ -261,12 +264,17 @@ const ProfileSection = () => {
             ...prev,
             lawyerRequestStatus: statusMap[application.status] || 'pending'
           }));
+          // Store application ID for detail modal
+          if (application.id) {
+            setApplicationId(application.id);
+          }
         }
       } else {
         setProfile(prev => ({
           ...prev,
           lawyerRequestStatus: null
         }));
+        setApplicationId(null);
       }
     } catch (error) {
       console.error('Error checking lawyer application status:', error);
@@ -282,6 +290,18 @@ const ProfileSection = () => {
       text1: 'Gửi đơn thành công',
       text2: 'Đơn đăng ký của bạn đang được xét duyệt'
     });
+  };
+
+  const handleViewApplicationDetails = () => {
+    if (applicationId) {
+      setShowApplicationDetailModal(true);
+    }
+  };
+
+  const handleApplicationDetailClose = () => {
+    setShowApplicationDetailModal(false);
+    // Reload application status after closing (in case documents were updated)
+    checkLawyerApplicationStatus();
   };
 
   const handleAvatarPress = () => {
@@ -537,6 +557,17 @@ const ProfileSection = () => {
       {/* Lawyer Request Status */}
       {renderLawyerRequestStatus()}
 
+      {/* View Application Details Button */}
+      {profile.lawyerRequestStatus && applicationId && (
+        <Pressable 
+          style={styles.viewApplicationButton} 
+          onPress={handleViewApplicationDetails}
+        >
+          <Ionicons name="document-text-outline" size={20} color={COLORS.WHITE} />
+          <Text style={styles.viewApplicationText}>Xem chi tiết đơn đăng ký</Text>
+        </Pressable>
+      )}
+
       {/* Lawyer Request Button */}
       {!profile.lawyerRequestStatus && currentUser?.role !== 'LAWYER' && (
         <Pressable 
@@ -559,6 +590,13 @@ const ProfileSection = () => {
         visible={showLawyerRequestModal}
         onClose={() => setShowLawyerRequestModal(false)}
         onSubmit={handleLawyerRequest}
+      />
+
+      {/* Application Detail Modal */}
+      <LawyerApplicationDetailModal
+        visible={showApplicationDetailModal}
+        onClose={handleApplicationDetailClose}
+        applicationId={applicationId}
       />
 
     </ScrollView>
@@ -781,6 +819,22 @@ const styles = StyleSheet.create({
       marginTop: 16,
     },
     lawyerRequestText: {
+      color: COLORS.WHITE,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 8,
+    },
+    viewApplicationButton: {
+      backgroundColor: COLORS.BLUE,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      borderRadius: 8,
+      marginHorizontal: 16,
+      marginTop: 16,
+    },
+    viewApplicationText: {
       color: COLORS.WHITE,
       fontSize: 16,
       fontWeight: '600',

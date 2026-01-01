@@ -149,6 +149,64 @@ export const hasUserApplied = async () => {
     }
 };
 
+/**
+ * Get detailed application information
+ * @returns {Promise<Object|null>} Detailed application data or null if not found
+ */
+export const getApplicationDetails = async () => {
+    try {
+        const response = await apiClient.get('/lawyer/application');
+        
+        if (response.status >= 200 && response.status < 300) {
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return null;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching application details:', error);
+        if (error.response?.data?.message) {
+            throw new Error(error.response.data.message);
+        }
+        throw error;
+    }
+};
+
+/**
+ * Update application documents
+ * @param {number} applicationId - Application ID
+ * @param {Array<string>} documentUrls - Array of document URLs
+ * @returns {Promise<Object>} Updated application data
+ */
+export const updateApplicationDocuments = async (applicationId, documentUrls) => {
+    try {
+        const response = await apiClient.put(`/lawyer/application/${applicationId}/documents`, {
+            documentUrls: documentUrls
+        });
+        
+        if (response.status >= 200 && response.status < 300) {
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            throw new Error(response.data.message || 'Failed to update documents');
+        } else {
+            console.error('API returned non-success status:', response.status);
+            const errorMessage = response.data?.message || 'Failed to update documents';
+            throw new Error(errorMessage);
+        }
+    } catch (error) {
+        console.error('Error updating application documents:', error);
+        // Extract error message from response
+        if (error.response?.data?.message) {
+            throw new Error(error.response.data.message);
+        }
+        throw error;
+    }
+};
+
 // Export default object with all methods
 const LawyerService = {
     uploadDocuments,
@@ -156,6 +214,8 @@ const LawyerService = {
     getUserApplication,
     canUserApply,
     hasUserApplied,
+    getApplicationDetails,
+    updateApplicationDocuments,
 };
 
 export default LawyerService;
