@@ -251,7 +251,7 @@ const LawyerRequestModal = ({ visible, onClose, onSubmit }) => {
     return (
       <View style={styles.documentList}>
         {documents.map((doc, index) => (
-          <View key={index} style={styles.documentItem}>
+          <View key={`doc-${doc.name || doc.uri || index}-${index}`} style={styles.documentItem}>
             <View style={styles.documentInfo}>
               <Ionicons name="document-outline" size={20} color={COLORS.BLUE} />
               <Text style={styles.documentName} numberOfLines={1}>

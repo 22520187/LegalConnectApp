@@ -161,7 +161,7 @@ const AskQuestion = ({ navigation }) => {
             </Text>
             <View style={styles.previewTagsContainer}>
                 {tags.map((tag, index) => (
-                    <View key={index} style={styles.previewTag}>
+                    <View key={`preview-tag-${tag}-${index}`} style={styles.previewTag}>
                         <Text style={styles.previewTagText}>{tag}</Text>
                     </View>
                 ))}
@@ -218,7 +218,7 @@ const AskQuestion = ({ navigation }) => {
                 </View>
                 <View style={styles.tagsContainer}>
                     {tags.map((tag, index) => (
-                        <View key={index} style={styles.tag}>
+                        <View key={`input-tag-${tag}-${index}`} style={styles.tag}>
                             <Text style={styles.tagText}>{tag}</Text>
                             <TouchableOpacity onPress={() => removeTag(tag)}>
                                 <Ionicons name="close" size={16} color={COLORS.WHITE} />
@@ -275,7 +275,7 @@ const AskQuestion = ({ navigation }) => {
             <View style={styles.suggestionSection}>
                 <Text style={styles.suggestionTitle}>Câu hỏi tương tự</Text>
                 {similarQuestions.map((question, index) => (
-                    <TouchableOpacity key={index} style={styles.suggestionItem}>
+                    <TouchableOpacity key={`similar-${question.substring(0, 20)}-${index}`} style={styles.suggestionItem}>
                         <Text style={styles.suggestionText}>{question}</Text>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.GRAY} />
                     </TouchableOpacity>
@@ -286,7 +286,7 @@ const AskQuestion = ({ navigation }) => {
             <View style={styles.suggestionSection}>
                 <Text style={styles.suggestionTitle}>Hướng dẫn viết câu hỏi</Text>
                 {guidelines.map((guideline, index) => (
-                    <View key={index} style={styles.guidelineItem}>
+                    <View key={`guideline-${guideline.substring(0, 20)}-${index}`} style={styles.guidelineItem}>
                         <Ionicons name="checkmark-circle" size={16} color={COLORS.GREEN} />
                         <Text style={styles.guidelineText}>{guideline}</Text>
                     </View>

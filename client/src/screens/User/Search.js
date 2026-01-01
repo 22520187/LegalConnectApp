@@ -286,7 +286,7 @@ const Search = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Tìm kiếm gần đây</Text>
           {recentSearches.map((search, index) => (
             <TouchableOpacity
-              key={index}
+              key={`recent-search-${search}-${index}`}
               style={styles.recentSearchItem}
               onPress={() => handleRecentSearchPress(search)}
             >
@@ -310,7 +310,7 @@ const Search = ({ navigation }) => {
         <View style={styles.tagsContainer}>
           {popularTags.map((tag, index) => (
             <TouchableOpacity
-              key={index}
+              key={`popular-tag-${tag}-${index}`}
               style={styles.tagChip}
               onPress={() => handleTagPress(tag)}
             >

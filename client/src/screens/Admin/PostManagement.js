@@ -431,7 +431,7 @@ const PostManagement = () => {
           {post.reports && post.reports.length > 0 ? (
             <>
               {post.reports.slice(0, 2).map((report, index) => (
-                <Text key={index} style={styles.reportReason}>
+                <Text key={`report-${post.id}-${index}-${report.id || report.reason || index}`} style={styles.reportReason}>
                   • {report.reason}
                 </Text>
               ))}
@@ -537,7 +537,7 @@ const PostManagement = () => {
           {post.reports && post.reports.length > 0 ? (
             <>
               {post.reports.slice(0, 2).map((report, index) => (
-                <Text key={index} style={styles.reportReason}>
+                <Text key={`report-processed-${post.id}-${index}-${report.id || report.reason || index}`} style={styles.reportReason}>
                   • {report.reason}
                 </Text>
               ))}
@@ -749,7 +749,7 @@ const PostManagement = () => {
                   
                   {selectedPost.reports && selectedPost.reports.length > 0 ? (
                     selectedPost.reports.map((report, index) => (
-                      <View key={index} style={styles.modalReportItem}>
+                      <View key={`modal-report-${selectedPost.id}-${index}-${report.id || report.reason || index}`} style={styles.modalReportItem}>
                         <Text style={styles.modalReportReason}>{report.reason}</Text>
                         {report.reportedBy && (
                           <Text style={styles.modalReportBy}>

@@ -25,8 +25,8 @@ const QuestionList = ({
   const renderEmptyState = () => {
     const defaultEmpty = {
       icon: '📝',
-      title: 'No questions yet',
-      text: 'Be the first to ask a legal question!'
+      title: 'Chưa có bài viết',
+      text: 'Hãy là người đầu tiên đặt câu hỏi pháp lý!'
     };
     
     const empty = emptyState || defaultEmpty;
@@ -45,7 +45,7 @@ const QuestionList = ({
     
     return (
       <View style={styles.footerLoader}>
-        <Text style={styles.loadingText}>Loading more...</Text>
+        <Text style={styles.loadingText}>Đang tải thêm...</Text>
       </View>
     );
   };

@@ -362,29 +362,17 @@ const ProfileSection = () => {
         throw new Error('Upload failed');
       }
 
-      // Update profile with new avatar URL
-      const userId = currentUser.id || currentUser.userId;
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-
-      const updatedProfile = await UserService.updateProfile(userId, {
+      // Only upload avatar (do not call updateProfile)
+      setProfile(prev => ({
+        ...prev,
         avatar: avatarUrl
+      }));
+
+      Toast.show({
+        type: 'success',
+        text1: 'Thành công',
+        text2: 'Đã tải ảnh đại diện lên'
       });
-
-      if (updatedProfile) {
-        // Update local state
-        setProfile(prev => ({
-          ...prev,
-          avatar: updatedProfile.avatar || avatarUrl
-        }));
-
-        Toast.show({
-          type: 'success',
-          text1: 'Thành công',
-          text2: 'Đã cập nhật ảnh đại diện'
-        });
-      }
     } catch (error) {
       console.error('Error uploading avatar:', error);
       Toast.show({

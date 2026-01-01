@@ -10,9 +10,16 @@ import apiClient from './ApiClient';
  */
 export const reportPost = async (postId, reportData) => {
     try {
+        const reason = (reportData?.reason || '').toString().trim();
+        const descriptionRaw = reportData?.description;
+        const description =
+            descriptionRaw === undefined || descriptionRaw === null
+                ? null
+                : descriptionRaw.toString().trim();
+
         const response = await apiClient.post(`/posts/${postId}/reports`, {
-            reason: reportData.reason,
-            description: reportData.description || null,
+            reason,
+            description,
         });
         
         if (response.status >= 200 && response.status < 300) {
@@ -25,8 +32,16 @@ export const reportPost = async (postId, reportData) => {
             console.error('API returned non-success status:', response.status);
             const error = new Error('Failed to report post');
             error.response = response;
-            if (response.data && response.data.message) {
-                error.message = response.data.message;
+            // Prefer backend validation errors when available
+            if (response.data) {
+                if (response.data.data && typeof response.data.data === 'object') {
+                    const validationErrors = Object.values(response.data.data)
+                        .filter(Boolean)
+                        .join('\n');
+                    error.message = validationErrors || response.data.message || error.message;
+                } else if (response.data.message) {
+                    error.message = response.data.message;
+                }
             }
             throw error;
         }

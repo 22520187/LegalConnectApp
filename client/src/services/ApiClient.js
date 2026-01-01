@@ -2,8 +2,21 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '@env';
 
-// API base URL - using ngrok for remote access
-const API_BASE_URL = (API_URL ? API_URL.replace(/['"\s]+/g, '') : 'http://localhost:8080') + '/api';
+// Clean and process API URL from environment variable
+const cleanApiUrl = API_URL 
+  ? API_URL.replace(/['"\s]+/g, '').trim().replace(/\/+$/, '') 
+  : 'http://localhost:8080';
+
+// Construct API base URL
+const API_BASE_URL = cleanApiUrl + '/api';
+
+// Debug logging (remove in production if needed)
+if (__DEV__) {
+  console.log('🔧 API Configuration:');
+  console.log('  - API_URL from env:', API_URL);
+  console.log('  - Clean API URL:', cleanApiUrl);
+  console.log('  - Final API_BASE_URL:', API_BASE_URL);
+}
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -11,12 +24,10 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
   },
-  timeout: 10000,
+  timeout: 30000, // 30 seconds timeout for better network reliability
   validateStatus: status => status >= 200 && status < 500,
   withCredentials: true,
-
 });
 
 // Add request interceptor to add auth token to requests
@@ -86,16 +97,24 @@ apiClient.interceptors.response.use(
       }
     } else if (error.request) {
       // Request made but no response received
-      console.error('No response received. Network error or server is down:', error.request);
+      console.error('❌ Network Error: No response received from server');
+      console.error('  - Server might be down or unreachable');
+      console.error('  - Check if backend is running at:', API_BASE_URL);
+      console.error('  - Check network connection');
+      console.error('  - Full error:', error.message);
     } else {
       // Error in setting up the request
-      console.error('Request setup error:', error.message);
+      console.error('❌ Request setup error:', error.message);
     }
 
-    // Thêm thông tin về thời gian và URL gây lỗi để debug
-    console.log('Error occurred at:', new Date().toISOString());
-    console.log('Request URL:', error.config?.url);
-    console.log('Request method:', error.config?.method);
+    // Debug information
+    if (__DEV__) {
+      console.log('📋 Error Details:');
+      console.log('  - Time:', new Date().toISOString());
+      console.log('  - Request URL:', error.config?.baseURL + error.config?.url);
+      console.log('  - Request method:', error.config?.method?.toUpperCase());
+      console.log('  - Full URL:', error.config?.url ? `${error.config.baseURL}${error.config.url}` : 'N/A');
+    }
 
     return Promise.reject(error);
   }

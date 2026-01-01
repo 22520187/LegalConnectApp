@@ -7,21 +7,24 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import COLORS from '../../constant/colors';
 import SCREENS from '../index';
 import { Ionicons } from '@expo/vector-icons';
+import AuthService from '../../services/AuthService';
 
 const Login = () => {
   const navigation = useNavigation();
-  const { login, loading: authLoading } = useAuth();
+  const { login, loginWithGoogle, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
@@ -61,6 +64,28 @@ const Login = () => {
 
   const handleSignUp = () => {
     navigation.navigate(SCREENS.SIGNUP);
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      setGoogleLoading(true);
+      
+      // Lấy OAuth URL từ backend
+      const oauthUrl = await AuthService.getGoogleOAuthUrl();
+      
+      // Mở URL trong browser
+      const supported = await Linking.canOpenURL(oauthUrl);
+      if (supported) {
+        await Linking.openURL(oauthUrl);
+      } else {
+        Alert.alert('Lỗi', 'Không thể mở trình duyệt');
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể đăng nhập bằng Google');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -135,6 +160,27 @@ const Login = () => {
             <ActivityIndicator color={COLORS.WHITE} size="small" />
           ) : (
             <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>Hoặc</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.googleButton, googleLoading && styles.disabledButton]}
+          onPress={handleGoogleLogin}
+          disabled={googleLoading || authLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color={COLORS.BLACK} size="small" />
+          ) : (
+            <>
+              <Ionicons name="logo-google" size={20} color={COLORS.BLACK} />
+              <Text style={styles.googleButtonText}>Đăng nhập bằng Google</Text>
+            </>
           )}
         </TouchableOpacity>
 
@@ -248,6 +294,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.BLUE,
     fontWeight: 'bold',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.LIGHT_GRAY,
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    fontSize: 14,
+    color: COLORS.GRAY,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.WHITE,
+    borderWidth: 1,
+    borderColor: COLORS.LIGHT_GRAY,
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 10,
+    gap: 10,
+  },
+  googleButtonText: {
+    color: COLORS.BLACK,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

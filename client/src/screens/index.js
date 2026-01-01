@@ -16,6 +16,7 @@ import PostManagement from './Admin/PostManagement';
 import LegalDocuments from './LegalDocuments';
 import LegalDocumentDetail from './LegalDocumentDetail';
 import Statistic from './Admin/Statistic';
+import CategoryManagement from './Admin/CategoryManagement';
 
 const SCREENS = {
     LOGIN: 'Login',
@@ -38,6 +39,7 @@ const SCREENS = {
     LAWYER_MANAGEMENT: 'LawyerManagement',
     ADMIN_ACCOUNT: 'AdminAccount',
     STATISTIC: 'Statistic',
+    CATEGORY_MANAGEMENT: 'CategoryManagement',
 }
 
 export default SCREENS;

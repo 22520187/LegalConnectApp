@@ -154,6 +154,52 @@ class AuthService {
       console.error('Clear stored auth error:', error);
     }
   }
+
+  // Lấy Google OAuth URL từ backend
+  async getGoogleOAuthUrl() {
+    try {
+      const response = await apiClient.get('/auth/oauth/mobile/google');
+      const result = this.handleResponse(response);
+      
+      if (result.success && result.data) {
+        // Backend trả về URL trong data field
+        return result.data;
+      }
+      throw new Error('Failed to get OAuth URL');
+    } catch (error) {
+      console.error('Get Google OAuth URL error:', error);
+      throw error;
+    }
+  }
+
+  // Xử lý OAuth callback với code từ Google
+  async handleGoogleOAuthCallback(code, provider = 'google') {
+    try {
+      // Backend nhận @RequestParam, nên gửi params trong query string
+      const response = await apiClient.post(
+        `/auth/oauth/mobile/callback?code=${encodeURIComponent(code)}&provider=${encodeURIComponent(provider)}`,
+        null
+      );
+
+      const result = this.handleResponse(response);
+      
+      // Lưu token nếu có
+      if (result.success && result.data?.token) {
+        await AsyncStorage.setItem('userToken', result.data.token);
+      }
+      
+      // Lưu thông tin user vào AsyncStorage
+      if (result.success && result.data) {
+        await AsyncStorage.setItem('user', JSON.stringify(result.data));
+        await AsyncStorage.setItem('isAuthenticated', 'true');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new AuthService();

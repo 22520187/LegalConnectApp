@@ -305,7 +305,7 @@ const Statistic = () => {
       <View style={styles.statsGrid}>
         {overviewStats.map((stat, index) => (
           <StatCard
-            key={index}
+            key={`stat-${stat.title}-${index}`}
             title={stat.title}
             value={stat.value}
             change={stat.change}
@@ -399,7 +399,7 @@ const Statistic = () => {
             />
             <View style={styles.legendContainer}>
               {userTypeLabels.map((item, index) => (
-                <View key={index} style={styles.legendItem}>
+                <View key={`legend-${item.label}-${index}`} style={styles.legendItem}>
                   <View style={[styles.legendColor, { backgroundColor: item.color }]} />
                   <Text style={styles.legendText}>{item.label}</Text>
                 </View>
@@ -418,7 +418,7 @@ const Statistic = () => {
         {recentActivities.length > 0 ? (
           <View style={styles.activityList}>
             {recentActivities.map((activity, index) => (
-              <View key={index} style={styles.activityItem}>
+              <View key={`activity-${activity.title}-${index}`} style={styles.activityItem}>
                 <View style={styles.activityIcon}>
                   <Text style={styles.activityIconText}>{activity.icon}</Text>
                 </View>

@@ -153,6 +153,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (code) => {
+    try {
+      setLoading(true);
+      const result = await AuthService.handleGoogleOAuthCallback(code, 'google');
+      
+      if (result.success) {
+        setUser(result.data);
+        setIsAuthenticated(true);
+        Toast.show({
+          type: 'success',
+          text1: 'Đăng nhập thành công',
+          text2: result.message || 'Chào mừng bạn quay trở lại!',
+        });
+        return { success: true };
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Đăng nhập thất bại',
+          text2: result.message || 'Vui lòng thử lại',
+        });
+        return { success: false, message: result.message };
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Đăng nhập thất bại',
+        text2: error.message || 'Có lỗi xảy ra, vui lòng thử lại',
+      });
+      return { success: false, message: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     isAuthenticated,
     user,
@@ -161,6 +196,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     refreshUser,
+    loginWithGoogle,
   };
 
   return (

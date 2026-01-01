@@ -60,6 +60,22 @@ const ReportModal = ({
   };
 
   const handleSubmit = async () => {
+    // Only "post" reporting is implemented with backend API right now.
+    // "user" reporting currently only triggers onSubmit callback (frontend-only).
+    if (reportType !== 'post') {
+      Alert.alert(
+        'Chưa hỗ trợ',
+        'Hiện tại chức năng báo cáo chỉ hỗ trợ báo cáo bài viết (post). Báo cáo người dùng sẽ được bổ sung sau.',
+        [{ text: 'OK', onPress: onClose }]
+      );
+      return;
+    }
+
+    if (!targetId) {
+      Alert.alert('Lỗi', 'Không xác định được bài viết cần báo cáo. Vui lòng thử lại.');
+      return;
+    }
+
     if (!selectedReason) {
       Alert.alert('Lỗi', 'Vui lòng chọn lý do báo cáo');
       return;
@@ -73,42 +89,26 @@ const ReportModal = ({
     setIsSubmitting(true);
 
     try {
-      const reasonText = selectedReason === 'Lý do khác' ? otherReason : selectedReason;
+      // Backend validation:
+      // - reason: required, max 100 chars
+      // - description: optional, max 500 chars
+      // If user selects "Lý do khác", keep `reason` short and send the detailed text in `description`.
+      const reasonText = selectedReason; // always keep reason as the selected option
+      const descriptionText =
+        selectedReason === 'Lý do khác' ? otherReason.trim() : null;
       
-      // Chỉ gọi API nếu là báo cáo bài viết (post)
-      if (reportType === 'post' && targetId) {
-        const reportData = {
-          reason: reasonText,
-          description: selectedReason === 'Lý do khác' ? otherReason : null,
-        };
+      const reportData = {
+        reason: reasonText,
+        description: descriptionText,
+      };
 
-        await PostReportService.reportPost(targetId, reportData);
+      await PostReportService.reportPost(targetId, reportData);
 
-        Alert.alert(
-          'Báo cáo đã gửi',
-          'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
-          [{ text: 'OK', onPress: onClose }]
-        );
-      } else {
-        // Nếu là báo cáo user hoặc không có targetId, vẫn gọi callback nếu có
-        const reportData = {
-          targetId,
-          targetTitle,
-          reportType,
-          reason: reasonText,
-          timestamp: new Date().toISOString(),
-        };
-
-        if (onSubmit) {
-          onSubmit(reportData);
-        }
-
-        Alert.alert(
-          'Báo cáo đã gửi',
-          'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
-          [{ text: 'OK', onPress: onClose }]
-        );
-      }
+      Alert.alert(
+        'Báo cáo đã gửi',
+        'Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét và xử lý trong thời gian sớm nhất.',
+        [{ text: 'OK', onPress: onClose }]
+      );
 
       // Reset form
       setSelectedReason('');
@@ -159,7 +159,7 @@ const ReportModal = ({
             
             {reasons.map((reason, index) => (
               <TouchableOpacity
-                key={index}
+                key={`reason-${reason}-${index}`}
                 style={[
                   styles.reasonItem,
                   selectedReason === reason && styles.selectedReasonItem

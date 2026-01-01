@@ -97,7 +97,7 @@ const LegalDocumentDetail = () => {
         style={styles.tagsContainer}
       >
         {tags.map((tag, index) => (
-          <View key={index} style={styles.tag}>
+          <View key={`doc-detail-tag-${tag}-${index}`} style={styles.tag}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
         ))}

@@ -94,9 +94,9 @@ const LegalExpertiseSection = ({
           </View>
         ) : (
           <ScrollView style={styles.optionsContainer} nestedScrollEnabled>
-            {categories.map((expertise) => (
+            {categories.map((expertise, index) => (
               <Pressable
-                key={expertise}
+                key={`expertise-${expertise}-${index}`}
                 style={[
                   styles.optionItem,
                   selectedExpertises.includes(expertise) && styles.selectedOption

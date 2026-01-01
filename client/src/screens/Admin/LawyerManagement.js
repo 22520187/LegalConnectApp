@@ -360,7 +360,7 @@ const LawyerManagement = () => {
           <View style={styles.documentsList}>
             {item.documents?.documentUrls && item.documents.documentUrls.length > 0 ? (
               item.documents.documentUrls.map((url, index) => (
-                <Text key={index} style={styles.documentItem}>• {url}</Text>
+                <Text key={`doc-${item.id || item.email || 'item'}-${index}-${url.substring(0, 20)}`} style={styles.documentItem}>• {url}</Text>
               ))
             ) : (
               <Text style={styles.documentItem}>• Không có tài liệu đính kèm</Text>
@@ -653,7 +653,7 @@ const LawyerManagement = () => {
                   <View style={styles.documentsList}>
                     {selectedApplication.documents?.documentUrls && selectedApplication.documents.documentUrls.length > 0 ? (
                       selectedApplication.documents.documentUrls.map((url, index) => (
-                        <Text key={index} style={styles.documentItem}>• {url}</Text>
+                        <Text key={`modal-doc-${selectedApplication.id || selectedApplication.email || 'app'}-${index}-${url.substring(0, 20)}`} style={styles.documentItem}>• {url}</Text>
                       ))
                     ) : (
                       <Text style={styles.documentItem}>• Không có tài liệu đính kèm</Text>

@@ -46,7 +46,7 @@ const QuestionCard = ({ question, onPress }) => {
         style={styles.tagsContainer}
       >
         {tags.map((tag, index) => (
-          <View key={index} style={styles.tag}>
+          <View key={`question-card-tag-${tag}-${index}`} style={styles.tag}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
         ))}
@@ -61,6 +61,16 @@ const QuestionCard = ({ question, onPress }) => {
         <Text style={styles.title} numberOfLines={2}>
           {question.title}
         </Text>
+
+        {/* Category */}
+        {!!question.categoryName && (
+          <View style={styles.categoryRow}>
+            <Ionicons name="folder-outline" size={14} color={COLORS.GRAY_DARK} />
+            <Text style={styles.categoryText} numberOfLines={1}>
+              {question.categoryName}
+            </Text>
+          </View>
+        )}
 
         {/* Question Summary */}
         <Text style={styles.summary} numberOfLines={3}>
@@ -157,6 +167,18 @@ const styles = StyleSheet.create({
     color: COLORS.BLACK,
     marginBottom: 8,
     lineHeight: 22,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  categoryText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: COLORS.GRAY_DARK,
+    fontWeight: '600',
+    flex: 1,
   },
   summary: {
     fontSize: 14,

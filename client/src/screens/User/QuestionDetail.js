@@ -459,7 +459,7 @@ const QuestionDetail = ({ route, navigation }) => {
         style={styles.tagsContainer}
       >
         {tags.map((tag, index) => (
-          <View key={index} style={styles.tag}>
+          <View key={`tag-${tag}-${index}`} style={styles.tag}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
         ))}
@@ -774,7 +774,7 @@ const QuestionDetail = ({ route, navigation }) => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.relatedTagsContainer}>
               {question.tags.map((tag, index) => (
-                <TouchableOpacity key={index} style={styles.relatedTag}>
+                <TouchableOpacity key={`related-tag-${tag}-${index}`} style={styles.relatedTag}>
                   <Text style={styles.relatedTagText}>{tag}</Text>
                 </TouchableOpacity>
               ))}

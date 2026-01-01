@@ -57,7 +57,7 @@ const LegalDocumentCard = ({ document, onViewDetail, onDownload, onViewSource })
         style={styles.tagsContainer}
       >
         {tags.map((tag, index) => (
-          <View key={index} style={styles.tag}>
+          <View key={`doc-card-tag-${tag}-${index}`} style={styles.tag}>
             <Text style={styles.tagText}>{tag}</Text>
           </View>
         ))}

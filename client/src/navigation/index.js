@@ -6,6 +6,7 @@ import SignUp from '../screens/Auth/SignUp';
 import SCREENS, { Home, MyPosts, Profile, AskQuestion, ChatBot, Message, QuestionDetail, ChatScreen, UserProfile, Notification, Search, UserManagement, PostManagement, LawyerManagement, AdminAccount, LegalDocuments, LegalDocumentDetail, Statistic } from '../screens';
 import { useIsKeyboardVisible } from '../hooks/useIsKeyboardVisible';
 import COLORS from '../constant/colors';
+import CategoryManagement from '../screens/Admin/CategoryManagement';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -158,6 +159,8 @@ const AdminTabNavigator = () => {
                         iconName = focused ? 'document-text' : 'document-text-outline';
                     } else if (route.name === SCREENS.USER_MANAGEMENT) {
                         iconName = focused ? 'people' : 'people-outline';
+                    } else if (route.name === SCREENS.CATEGORY_MANAGEMENT) {
+                        iconName = focused ? 'list' : 'list-outline';
                     }else if (route.name === SCREENS.ADMIN_ACCOUNT) {
                         iconName = focused ? 'person' : 'person-outline';
                     } else if (route.name === SCREENS.LAWYER_MANAGEMENT) {
@@ -191,6 +194,13 @@ const AdminTabNavigator = () => {
                 component={PostManagement}
                 options={{
                     tabBarLabel: 'Bài viết',
+                }}
+            />
+            <Tab.Screen
+                name={SCREENS.CATEGORY_MANAGEMENT}
+                component={CategoryManagement}
+                options={{
+                    tabBarLabel: 'Danh mục',
                 }}
             />
             <Tab.Screen

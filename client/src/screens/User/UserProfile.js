@@ -308,7 +308,7 @@ const UserProfile = () => {
                 <Text style={styles.expertiseTitle}>Chuyên môn:</Text>
                 <View style={styles.expertiseTags}>
                   {userProfile.legalExpertise.map((expertise, index) => (
-                    <View key={index} style={styles.expertiseTag}>
+                    <View key={`expertise-${expertise}-${index}`} style={styles.expertiseTag}>
                       <Text style={styles.expertiseText}>{expertise}</Text>
                     </View>
                   ))}

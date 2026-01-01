@@ -10,9 +10,9 @@ import COLORS from '../../constant/colors';
 
 const FilterTabs = ({ activeTab, onTabChange }) => {
   const tabs = [
-    { key: 'newest', label: 'Newest', icon: '🕒' },
-    { key: 'hot', label: 'Hot', icon: '🔥' },
-    { key: 'unanswered', label: 'Unanswered', icon: '❓' },
+    { key: 'newest', label: 'Mới nhất', icon: '🕒' },
+    { key: 'mostViewed', label: 'Xem nhiều', icon: '👁️' },
+    { key: 'mostReplied', label: 'Nhiều phản hồi', icon: '💬' },
   ];
 
   return (
