@@ -207,6 +207,10 @@ const QuestionDetail = ({ route, navigation }) => {
   };
 
   const handleReport = () => {
+    // Không cho tự báo cáo bài viết của chính mình
+    if (question?.author?.id && currentUserId && question.author.id === currentUserId) {
+      return;
+    }
     setReportTarget({
       type: 'post',
       id: question.id,
@@ -508,13 +512,15 @@ const QuestionDetail = ({ route, navigation }) => {
         />
       </TouchableOpacity>
 
-      <TouchableOpacity 
-        style={styles.actionButton}
-        onPress={handleReport}
-      >
-        <Ionicons name="flag-outline" size={24} color={COLORS.RED} />
-        <Text style={styles.reportButtonText}>Báo cáo</Text>
-      </TouchableOpacity>
+      {!(question?.author?.id && currentUserId && question.author.id === currentUserId) && (
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={handleReport}
+        >
+          <Ionicons name="flag-outline" size={24} color={COLORS.RED} />
+          <Text style={styles.reportButtonText}>Báo cáo</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -545,14 +551,14 @@ const QuestionDetail = ({ route, navigation }) => {
             <Text style={styles.authorTitle}>{answer.author.title}</Text>
             <Text style={styles.authorReputation}>{answer.author.reputation} điểm uy tín</Text>
           </View>
-          {answer.author.id !== currentUserId && (
+          {/* {answer.author.id !== currentUserId && (
             <TouchableOpacity 
               style={styles.reportUserButton}
               onPress={() => handleReportUser(answer.author.id, answer.author.name)}
             >
               <Ionicons name="flag-outline" size={16} color={COLORS.RED} />
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
         <Text style={styles.answerTime}>{formatTimeAgo(answer.createdAt)}</Text>
       </View>
@@ -660,22 +666,22 @@ const QuestionDetail = ({ route, navigation }) => {
   );
   };
 
-  const renderRelatedQuestions = () => (
-    <View style={styles.relatedSection}>
-      <Text style={styles.relatedTitle}>Câu hỏi liên quan</Text>
-      {relatedQuestions.map((q) => (
-        <TouchableOpacity key={q.id} style={styles.relatedQuestion}>
-          <Text style={styles.relatedQuestionTitle} numberOfLines={2}>
-            {q.title}
-          </Text>
-          <View style={styles.relatedQuestionStats}>
-            <Text style={styles.relatedQuestionStat}>{q.voteCount} votes</Text>
-            <Text style={styles.relatedQuestionStat}>{q.answerCount} answers</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
+  // const renderRelatedQuestions = () => (
+  //   <View style={styles.relatedSection}>
+  //     <Text style={styles.relatedTitle}>Câu hỏi liên quan</Text>
+  //     {relatedQuestions.map((q) => (
+  //       <TouchableOpacity key={q.id} style={styles.relatedQuestion}>
+  //         <Text style={styles.relatedQuestionTitle} numberOfLines={2}>
+  //           {q.title}
+  //         </Text>
+  //         <View style={styles.relatedQuestionStats}>
+  //           <Text style={styles.relatedQuestionStat}>{q.voteCount} votes</Text>
+  //           <Text style={styles.relatedQuestionStat}>{q.answerCount} answers</Text>
+  //         </View>
+  //       </TouchableOpacity>
+  //     ))}
+  //   </View>
+  // );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -763,29 +769,6 @@ const QuestionDetail = ({ route, navigation }) => {
               <Text style={styles.emptyText}>Chưa có bình luận nào. Hãy là người đầu tiên trả lời!</Text>
             </View>
           )}
-        </View>
-
-        {/* Related Questions */}
-        {renderRelatedQuestions()}
-
-        {/* Related Tags */}
-        <View style={styles.relatedTagsSection}>
-          <Text style={styles.relatedTitle}>Tags liên quan</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.relatedTagsContainer}>
-              {question.tags.map((tag, index) => (
-                <TouchableOpacity key={`related-tag-${tag}-${index}`} style={styles.relatedTag}>
-                  <Text style={styles.relatedTagText}>{tag}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.relatedTag}>
-                <Text style={styles.relatedTagText}>Legal Advice</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.relatedTag}>
-                <Text style={styles.relatedTagText}>Compliance</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
         </View>
       </ScrollView>
 
