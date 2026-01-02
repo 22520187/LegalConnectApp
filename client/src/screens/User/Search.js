@@ -12,8 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import COLORS from '../../constant/colors';
 import { QuestionCard } from '../../components';
+import ForumService from '../../services/ForumService';
+
+const SEARCH_HISTORY_KEY = 'search_history';
+const MAX_SEARCH_HISTORY = 10;
 
 const Search = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,116 +29,60 @@ const Search = ({ navigation }) => {
   const [popularTags, setPopularTags] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(true);
 
-  // Mock data - sử dụng dữ liệu từ Home
-  const mockQuestions = [
-    {
-      id: 1,
-      title: 'What are the legal requirements for starting a business in Vietnam?',
-      summary: 'I want to start a small business and need to understand the legal procedures, required documents, and regulations...',
-      voteCount: 15,
-      answerCount: 3,
-      viewCount: 124,
-      tags: ['Business Law', 'Startup', 'Vietnam'],
-      author: {
-        id: 1,
-        name: 'Alice Johnson',
-        avatar: null,
-      },
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      hasAcceptedAnswer: true,
-    },
-    {
-      id: 2,
-      title: 'Employment contract termination rights in Vietnam',
-      summary: 'My employer wants to terminate my contract. What are my rights and what compensation should I expect?',
-      voteCount: 8,
-      answerCount: 5,
-      viewCount: 89,
-      tags: ['Employment Law', 'Contract', 'Rights'],
-      author: {
-        id: 2,
-        name: 'Mike Chen',
-        avatar: null,
-      },
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      hasAcceptedAnswer: false,
-    },
-    {
-      id: 3,
-      title: 'Intellectual property protection for software developers',
-      summary: 'How can I protect my mobile app idea and source code from being copied by competitors?',
-      voteCount: 12,
-      answerCount: 0,
-      viewCount: 67,
-      tags: ['IP Law', 'Software', 'Copyright'],
-      author: {
-        id: 3,
-        name: 'Sarah Wilson',
-        avatar: null,
-      },
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      hasAcceptedAnswer: false,
-    },
-    {
-      id: 4,
-      title: 'Real estate purchase agreement review needed',
-      summary: 'I am buying my first house and the contract seems complex. What should I look out for?',
-      voteCount: 6,
-      answerCount: 2,
-      viewCount: 45,
-      tags: ['Real Estate', 'Contract Review', 'Property'],
-      author: {
-        id: 4,
-        name: 'David Brown',
-        avatar: null,
-      },
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      hasAcceptedAnswer: false,
-    },
-    {
-      id: 5,
-      title: 'Divorce proceedings and child custody laws',
-      summary: 'What should I know about divorce procedures and how child custody is determined in Vietnamese law?',
-      voteCount: 20,
-      answerCount: 7,
-      viewCount: 203,
-      tags: ['Family Law', 'Divorce', 'Child Custody'],
-      author: {
-        id: 5,
-        name: 'Emma Davis',
-        avatar: null,
-      },
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      hasAcceptedAnswer: true,
-    },
-  ];
-
-  // Mock recent searches
-  const mockRecentSearches = [
-    'business law',
-    'contract',
-    'employment rights',
-    'divorce',
-  ];
-
-  // Mock popular tags
-  const mockPopularTags = [
-    'Business Law',
-    'Employment Law',
-    'Contract',
-    'Family Law',
-    'IP Law',
-    'Real Estate',
-    'Rights',
-    'Vietnam',
-    'Property',
-    'Software',
-  ];
-
+  // Load search history and popular tags on mount
   useEffect(() => {
-    setRecentSearches(mockRecentSearches);
-    setPopularTags(mockPopularTags);
+    loadSearchHistory();
+    loadPopularTags();
   }, []);
+
+  // Load search history from AsyncStorage
+  const loadSearchHistory = async () => {
+    try {
+      const historyJson = await AsyncStorage.getItem(SEARCH_HISTORY_KEY);
+      if (historyJson) {
+        const history = JSON.parse(historyJson);
+        setRecentSearches(Array.isArray(history) ? history : []);
+      }
+    } catch (error) {
+      console.error('Error loading search history:', error);
+    }
+  };
+
+  // Save search history to AsyncStorage
+  const saveSearchHistory = async (query) => {
+    try {
+      const trimmedQuery = query.trim().toLowerCase();
+      if (!trimmedQuery) return;
+
+      const historyJson = await AsyncStorage.getItem(SEARCH_HISTORY_KEY);
+      let history = historyJson ? JSON.parse(historyJson) : [];
+      
+      // Remove duplicate and add to front
+      history = history.filter(item => item.toLowerCase() !== trimmedQuery);
+      history.unshift(query.trim()); // Keep original case for display
+      
+      // Limit to MAX_SEARCH_HISTORY items
+      history = history.slice(0, MAX_SEARCH_HISTORY);
+      
+      await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+      setRecentSearches(history);
+    } catch (error) {
+      console.error('Error saving search history:', error);
+    }
+  };
+
+  // Load popular tags from API
+  const loadPopularTags = async () => {
+    try {
+      const tags = await ForumService.getPopularTags(5);
+      // Extract tag names from PopularTagDto (which has tag and count properties)
+      const tagNames = tags.map(tag => tag.tag || tag);
+      setPopularTags(tagNames);
+    } catch (error) {
+      console.error('Error loading popular tags:', error);
+      setPopularTags([]);
+    }
+  };
 
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
@@ -145,90 +94,71 @@ const Search = ({ navigation }) => {
     }
   }, [searchQuery, activeFilter]);
 
-  const performSearch = (query) => {
-    setLoading(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      let results = [];
-      const lowerQuery = query.toLowerCase();
-
-      if (activeFilter === 'all' || activeFilter === 'questions') {
-        // Tìm kiếm theo tiêu đề và nội dung câu hỏi
-        const questionResults = mockQuestions.filter(question => 
-          question.title.toLowerCase().includes(lowerQuery) ||
-          question.summary.toLowerCase().includes(lowerQuery)
-        );
-        results = [...results, ...questionResults];
+  // Map PostDto from API to QuestionCard format
+  const mapPostToQuestion = (post) => {
+    // Parse tags - backend returns Set<String> or comma-separated string
+    let tags = [];
+    if (post.tags) {
+      if (Array.isArray(post.tags)) {
+        tags = post.tags;
+      } else if (typeof post.tags === 'string') {
+        tags = post.tags.split(',').map(t => t.trim()).filter(t => t);
       }
+    }
 
-      if (activeFilter === 'all' || activeFilter === 'tags') {
-        // Tìm kiếm theo tag
-        const tagResults = mockQuestions.filter(question =>
-          question.tags && question.tags.some(tag => 
-            tag.toLowerCase().includes(lowerQuery)
-          )
-        );
-        
-        // Loại bỏ duplicate nếu đã có trong kết quả từ questions
-        tagResults.forEach(tagResult => {
-          if (!results.find(result => result.id === tagResult.id)) {
-            results.push(tagResult);
-          }
-        });
-      }
+    // Calculate vote count (upvote - downvote)
+    const voteCount = (post.upvoteCount || 0) - (post.downvoteCount || 0);
 
-      // Sắp xếp kết quả theo độ liên quan
-      results.sort((a, b) => {
-        const aScore = calculateRelevanceScore(a, lowerQuery);
-        const bScore = calculateRelevanceScore(b, lowerQuery);
-        return bScore - aScore;
-      });
-
-      setSearchResults(results);
-      setLoading(false);
-    }, 300);
+    return {
+      id: post.id,
+      title: post.title || '',
+      summary: post.content ? post.content.substring(0, 200) + (post.content.length > 200 ? '...' : '') : '',
+      voteCount: voteCount,
+      answerCount: post.replyCount || 0,
+      viewCount: post.views || 0,
+      tags: tags,
+      author: {
+        id: post.author?.id || 0,
+        name: post.author?.name || 'Unknown',
+        avatar: post.author?.avatar || null,
+      },
+      createdAt: post.createdAt ? new Date(post.createdAt) : new Date(),
+      hasAcceptedAnswer: post.solved || false,
+      categoryName: post.category?.name || null,
+    };
   };
 
-  const calculateRelevanceScore = (question, query) => {
-    let score = 0;
-    
-    // Tiêu đề chứa từ khóa được điểm cao hơn
-    if (question.title.toLowerCase().includes(query)) {
-      score += 10;
+  const performSearch = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
     }
+
+    setLoading(true);
     
-    // Tag khớp chính xác được điểm cao
-    if (question.tags && question.tags.some(tag => 
-      tag.toLowerCase() === query
-    )) {
-      score += 8;
+    try {
+      const response = await ForumService.searchPosts(query.trim(), {
+        page: 0,
+        size: 20,
+        sort: 'createdAt,desc'
+      });
+
+      // Handle paginated response
+      const posts = response.content || response || [];
+      const mappedResults = posts.map(mapPostToQuestion);
+      
+      setSearchResults(mappedResults);
+    } catch (error) {
+      console.error('Error searching posts:', error);
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
     }
-    
-    // Tag chứa từ khóa
-    if (question.tags && question.tags.some(tag => 
-      tag.toLowerCase().includes(query)
-    )) {
-      score += 5;
-    }
-    
-    // Nội dung chứa từ khóa
-    if (question.summary.toLowerCase().includes(query)) {
-      score += 3;
-    }
-    
-    // Bonus cho câu hỏi có nhiều vote và answer
-    score += question.voteCount * 0.1 + question.answerCount * 0.2;
-    
-    return score;
   };
 
   const handleSearchSubmit = () => {
     if (searchQuery.trim().length > 0) {
-      // Thêm vào recent searches
-      if (!recentSearches.includes(searchQuery.trim())) {
-        setRecentSearches(prev => [searchQuery.trim(), ...prev.slice(0, 4)]);
-      }
+      saveSearchHistory(searchQuery.trim());
       Keyboard.dismiss();
     }
   };
@@ -240,6 +170,11 @@ const Search = ({ navigation }) => {
 
   const handleRecentSearchPress = (query) => {
     setSearchQuery(query);
+    // Trigger search immediately when clicking recent search
+    if (query.trim().length > 0) {
+      performSearch(query);
+      setShowSuggestions(false);
+    }
   };
 
   const handleClearSearch = () => {
@@ -258,25 +193,25 @@ const Search = ({ navigation }) => {
     { key: 'tags', label: 'Tags', icon: 'pricetag' },
   ];
 
-  const renderFilterButton = (filter) => (
-    <TouchableOpacity
-      key={filter.key}
-      style={[styles.filterButton, activeFilter === filter.key && styles.activeFilterButton]}
-      onPress={() => setActiveFilter(filter.key)}
-    >
-      <Ionicons 
-        name={filter.icon} 
-        size={16} 
-        color={activeFilter === filter.key ? COLORS.WHITE : COLORS.GRAY} 
-      />
-      <Text style={[
-        styles.filterButtonText, 
-        activeFilter === filter.key && styles.activeFilterButtonText
-      ]}>
-        {filter.label}
-      </Text>
-    </TouchableOpacity>
-  );
+  // const renderFilterButton = (filter) => (
+  //   <TouchableOpacity
+  //     key={filter.key}
+  //     style={[styles.filterButton, activeFilter === filter.key && styles.activeFilterButton]}
+  //     onPress={() => setActiveFilter(filter.key)}
+  //   >
+  //     <Ionicons 
+  //       name={filter.icon} 
+  //       size={16} 
+  //       color={activeFilter === filter.key ? COLORS.WHITE : COLORS.GRAY} 
+  //     />
+  //     <Text style={[
+  //       styles.filterButtonText, 
+  //       activeFilter === filter.key && styles.activeFilterButtonText
+  //     ]}>
+  //       {filter.label}
+  //     </Text>
+  //   </TouchableOpacity>
+  // );
 
   const renderSuggestionsContent = () => (
     <ScrollView style={styles.suggestionsContainer} showsVerticalScrollIndicator={false}>
@@ -293,8 +228,14 @@ const Search = ({ navigation }) => {
               <Ionicons name="time-outline" size={20} color={COLORS.GRAY} />
               <Text style={styles.recentSearchText}>{search}</Text>
               <TouchableOpacity
-                onPress={() => {
-                  setRecentSearches(prev => prev.filter((_, i) => i !== index));
+                onPress={async () => {
+                  const newHistory = recentSearches.filter((_, i) => i !== index);
+                  setRecentSearches(newHistory);
+                  try {
+                    await AsyncStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory));
+                  } catch (error) {
+                    console.error('Error removing search history item:', error);
+                  }
                 }}
               >
                 <Ionicons name="close" size={16} color={COLORS.GRAY} />
@@ -331,26 +272,32 @@ const Search = ({ navigation }) => {
         </Text>
       </View>
       
-      <FlatList
-        data={searchResults}
-        renderItem={({ item }) => (
-          <QuestionCard
-            question={item}
-            onPress={handleQuestionPress}
-          />
-        )}
-        keyExtractor={(item) => item.id.toString()}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search" size={64} color={COLORS.GRAY} />
-            <Text style={styles.emptyTitle}>Không tìm thấy kết quả</Text>
-            <Text style={styles.emptyText}>
-              Thử tìm kiếm với từ khóa khác hoặc kiểm tra chính tả
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Đang tìm kiếm...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={searchResults}
+          renderItem={({ item }) => (
+            <QuestionCard
+              question={item}
+              onPress={handleQuestionPress}
+            />
+          )}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search" size={64} color={COLORS.GRAY} />
+              <Text style={styles.emptyTitle}>Không tìm thấy kết quả</Text>
+              <Text style={styles.emptyText}>
+                Thử tìm kiếm với từ khóa khác hoặc kiểm tra chính tả
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 
@@ -391,7 +338,7 @@ const Search = ({ navigation }) => {
         </View>
 
         {/* Filters */}
-        <View style={styles.filtersContainer}>
+        {/* <View style={styles.filtersContainer}>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -399,7 +346,7 @@ const Search = ({ navigation }) => {
           >
             {filterOptions.map(renderFilterButton)}
           </ScrollView>
-        </View>
+        </View> */}
 
         {/* Content */}
         {showSuggestions ? renderSuggestionsContent() : renderResultsContent()}

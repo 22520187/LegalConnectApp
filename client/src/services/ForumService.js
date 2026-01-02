@@ -302,6 +302,61 @@ export const getReplies = async (postId) => {
 };
 
 /**
+ * Search posts by keyword
+ * @param {string} keyword - Search keyword
+ * @param {Object} options - Query options
+ * @param {number} options.page - Page number (default: 0)
+ * @param {number} options.size - Page size (default: 20)
+ * @param {string} options.sort - Sort field and direction (e.g., "createdAt,desc")
+ * @returns {Promise<Object>} Page object with posts
+ */
+export const searchPosts = async (keyword, options = {}) => {
+    try {
+        const { 
+            page = 0, 
+            size = 20, 
+            sort = 'createdAt,desc'
+        } = options;
+
+        const params = { keyword, page, size, sort };
+        const response = await apiClient.get('/forum/posts/search', { params });
+
+        if (response.status >= 200 && response.status < 300) {
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        }
+    } catch (error) {
+        console.error('Error searching posts:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get popular tags
+ * @param {number} limit - Number of tags to return (default: 5)
+ * @returns {Promise<Array>} List of popular tags with count
+ */
+export const getPopularTags = async (limit = 5) => {
+    try {
+        const response = await apiClient.get('/forum/popular-tags', { 
+            params: { limit } 
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+            return Array.isArray(response.data) ? response.data : [];
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return [];
+        }
+    } catch (error) {
+        console.error('Error fetching popular tags:', error);
+        throw error;
+    }
+};
+
+/**
  * Create a reply to a post
  * @param {number} postId - Post ID
  * @param {Object} replyData - Reply data
@@ -362,6 +417,8 @@ const ForumService = {
     getReplies,
     createReply,
     getCategories,
+    searchPosts,
+    getPopularTags,
 };
 
 export default ForumService;
