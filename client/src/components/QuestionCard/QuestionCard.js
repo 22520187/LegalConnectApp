@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +13,12 @@ import COLORS from '../../constant/colors';
 
 const QuestionCard = ({ question, onPress }) => {
   const navigation = useNavigation();
+  const [avatarError, setAvatarError] = useState(false);
+
+  // Reset avatar error when avatar URL changes
+  useEffect(() => {
+    setAvatarError(false);
+  }, [question.author?.avatar]);
   
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
@@ -51,6 +58,31 @@ const QuestionCard = ({ question, onPress }) => {
           </View>
         ))}
       </ScrollView>
+    );
+  };
+
+  const renderAvatar = () => {
+    const avatarUrl = question.author?.avatar;
+    const authorName = question.author?.name || 'Unknown';
+    
+    // Show image if avatar URL exists and no error occurred
+    if (avatarUrl && !avatarError) {
+      return (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={styles.userAvatarImage}
+          onError={() => setAvatarError(true)}
+        />
+      );
+    }
+    
+    // Fallback to initials if no avatar or error loading
+    return (
+      <View style={styles.userAvatarFallback}>
+        <Text style={styles.userAvatarText}>
+          {authorName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
     );
   };
 
@@ -122,10 +154,8 @@ const QuestionCard = ({ question, onPress }) => {
 
           {/* User Info */}
           <View style={styles.userInfo}>
-            <TouchableOpacity style={styles.userAvatar} onPress={handleAvatarPress}>
-              <Text style={styles.userAvatarText}>
-                {question.author.name.charAt(0).toUpperCase()}
-              </Text>
+            <TouchableOpacity onPress={handleAvatarPress}>
+              {renderAvatar()}
             </TouchableOpacity>
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{question.author.name}</Text>
@@ -225,7 +255,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  userAvatar: {
+  userAvatarImage: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
+    backgroundColor: COLORS.GRAY_BG,
+  },
+  userAvatarFallback: {
     width: 24,
     height: 24,
     borderRadius: 12,

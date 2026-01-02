@@ -373,26 +373,55 @@ const ProfileSection = () => {
 
   const uploadAvatarImage = async (imageUri) => {
     try {
+      if (!currentUser) {
+        Toast.show({
+          type: 'error',
+          text1: 'Lỗi',
+          text2: 'Vui lòng đăng nhập lại'
+        });
+        return;
+      }
+
+      const userId = currentUser.id || currentUser.userId;
+      if (!userId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Lỗi',
+          text2: 'Không tìm thấy thông tin người dùng'
+        });
+        return;
+      }
+
       setUploadingAvatar(true);
 
-      // Upload avatar
+      // Upload avatar to Cloudinary
       const avatarUrl = await UserService.uploadAvatar(imageUri);
 
       if (!avatarUrl) {
         throw new Error('Upload failed');
       }
 
-      // Only upload avatar (do not call updateProfile)
-      setProfile(prev => ({
-        ...prev,
-        avatar: avatarUrl
-      }));
+      // Update profile with the new avatar URL
+      const updatedProfile = await UserService.updateProfile(userId, { avatar: avatarUrl });
 
-      Toast.show({
-        type: 'success',
-        text1: 'Thành công',
-        text2: 'Đã tải ảnh đại diện lên'
-      });
+      if (updatedProfile) {
+        // Update local state with the updated profile from API
+        setProfile(prev => ({
+          ...prev,
+          avatar: updatedProfile.avatar || avatarUrl,
+          bio: updatedProfile.bio !== undefined ? updatedProfile.bio : prev.bio,
+          legalExpertise: updatedProfile.legalExpertise !== undefined ? updatedProfile.legalExpertise : prev.legalExpertise,
+          phoneNumber: updatedProfile.phoneNumber !== undefined ? updatedProfile.phoneNumber : prev.phoneNumber,
+        }));
+
+        Toast.show({
+          type: 'success',
+          text1: 'Thành công',
+          text2: 'Đã cập nhật ảnh đại diện'
+        });
+      } else {
+        throw new Error('Failed to update profile');
+      }
     } catch (error) {
       console.error('Error uploading avatar:', error);
       Toast.show({

@@ -133,7 +133,10 @@ export const getUserPosts = async (userId, options = {}) => {
         const response = await apiClient.get(`/users/${userId}/posts`, { params });
         
         if (response.status >= 200 && response.status < 300) {
-            // Backend trả về Page<UserPostDto> trực tiếp
+            // Backend trả về ApiResponse<Page<UserPostDto>>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
             return response.data;
         } else {
             console.error('API returned non-success status:', response.status);
