@@ -17,13 +17,17 @@ const CommentItem = ({
   onEdit,
   currentUserId = null,
   formatTimeAgo,
-  style
+  style,
+  authorRole = null
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(1));
 
   const isOwnComment = currentUserId && comment.authorId === currentUserId;
+  // Normalize role to uppercase for comparison
+  const normalizedRole = authorRole ? String(authorRole).toUpperCase() : null;
+  const isLawyer = normalizedRole === 'LAWYER';
   const maxLines = 3;
   const shouldShowExpand = comment.content.length > 100;
 
@@ -68,7 +72,10 @@ const CommentItem = ({
   return (
     <Animated.View style={[styles.container, style, { opacity: fadeAnim }]}>
       <TouchableOpacity
-        style={styles.commentWrapper}
+        style={[
+          styles.commentWrapper,
+          isLawyer && styles.lawyerCommentWrapper
+        ]}
         onLongPress={handleLongPress}
         delayLongPress={500}
         activeOpacity={0.7}
@@ -78,22 +85,32 @@ const CommentItem = ({
           <View style={styles.authorContainer}>
             <View style={[
               styles.authorAvatar,
-              isOwnComment && styles.ownCommentAvatar
+              isOwnComment && styles.ownCommentAvatar,
+              isLawyer && styles.lawyerAvatar
             ]}>
               <Text style={styles.authorAvatarText}>
                 {comment.author.charAt(0).toUpperCase()}
               </Text>
             </View>
             <View style={styles.authorInfo}>
-              <Text style={[
-                styles.authorName,
-                isOwnComment && styles.ownCommentAuthor
-              ]}>
-                {comment.author}
-                {isOwnComment && (
-                  <Text style={styles.youText}> (Bạn)</Text>
+              <View style={styles.authorNameRow}>
+                {isLawyer && (
+                  <View style={styles.lawyerBadge}>
+                    <Ionicons name="shield-checkmark" size={10} color={COLORS.WHITE} />
+                    <Text style={styles.lawyerBadgeText}>Luật sư</Text>
+                  </View>
                 )}
-              </Text>
+                <Text style={[
+                  styles.authorName,
+                  isOwnComment && styles.ownCommentAuthor,
+                  isLawyer && styles.lawyerName
+                ]}>
+                  {comment.author}
+                  {isOwnComment && (
+                    <Text style={styles.youText}> (Bạn)</Text>
+                  )}
+                </Text>
+              </View>
               <Text style={styles.commentTime}>
                 {formatTimeAgo(comment.createdAt)}
               </Text>
@@ -177,6 +194,37 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: COLORS.GRAY_LIGHT,
   },
+  lawyerCommentWrapper: {
+    borderLeftColor: COLORS.BLUE,
+    borderLeftWidth: 4,
+    backgroundColor: '#f0f9ff',
+  },
+  authorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  lawyerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.BLUE,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginRight: 6,
+    marginBottom: 2,
+  },
+  lawyerBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.WHITE,
+    marginLeft: 2,
+  },
+  lawyerAvatar: {
+    backgroundColor: COLORS.BLUE,
+    borderWidth: 2,
+    borderColor: COLORS.BLUE_LIGHT,
+  },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -215,6 +263,10 @@ const styles = StyleSheet.create({
   },
   ownCommentAuthor: {
     color: COLORS.GREEN,
+  },
+  lawyerName: {
+    color: COLORS.BLUE,
+    fontWeight: '700',
   },
   youText: {
     fontSize: 11,

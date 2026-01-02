@@ -81,31 +81,58 @@ const QuestionDetail = ({ route, navigation }) => {
       const replies = await ForumService.getReplies(postId);
       
       // Map API response to component format
-      const mappedReplies = replies.map(reply => ({
-        id: reply.id,
-        content: reply.content,
-        author: {
-          id: reply.author?.id,
-          name: reply.author?.name || 'Người dùng',
-          avatar: reply.author?.avatar,
-          title: reply.author?.role || '',
-          reputation: 0, // Backend doesn't provide this
-        },
-        upvoteCount: reply.upvoteCount || 0,
-        downvoteCount: reply.downvoteCount || 0,
-        voteCount: (reply.upvoteCount || 0) - (reply.downvoteCount || 0),
-        userVote: reply.userVote || null, // 'UPVOTE', 'DOWNVOTE', or null
-        createdAt: new Date(reply.createdAt),
-        isAccepted: reply.isSolution || false,
-        comments: reply.children ? reply.children.map(child => ({
-          id: child.id,
-          author: child.author?.name || 'Người dùng',
-          authorId: child.author?.id,
-          content: child.content,
-          createdAt: new Date(child.createdAt),
-          replyTo: null, // Can be enhanced later
-        })) : [],
-      }));
+      const mappedReplies = replies.map(reply => {
+        // Normalize role to uppercase for consistent comparison
+        // Backend may return role as "LAWYER", "lawyer", "Lawyer", or enum value
+        const rawRole = reply.author?.role;
+        let authorRole = null;
+        if (rawRole) {
+          const roleStr = String(rawRole).trim().toUpperCase();
+          // Handle different role formats: "LAWYER", "lawyer", "Lawyer", etc.
+          if (roleStr === 'LAWYER' || roleStr.includes('LAWYER')) {
+            authorRole = 'LAWYER';
+          }
+        }
+        
+        return {
+          id: reply.id,
+          content: reply.content,
+          author: {
+            id: reply.author?.id,
+            name: reply.author?.name || 'Người dùng',
+            avatar: reply.author?.avatar,
+            title: reply.author?.role || '',
+            role: authorRole, // Store normalized role
+            reputation: 0, // Backend doesn't provide this
+          },
+          upvoteCount: reply.upvoteCount || 0,
+          downvoteCount: reply.downvoteCount || 0,
+          voteCount: (reply.upvoteCount || 0) - (reply.downvoteCount || 0),
+          userVote: reply.userVote || null, // 'UPVOTE', 'DOWNVOTE', or null
+          createdAt: new Date(reply.createdAt),
+          isAccepted: reply.isSolution || false,
+          comments: reply.children ? reply.children.map(child => {
+            // Normalize role for comments too
+            const rawChildRole = child.author?.role;
+            let childRole = null;
+            if (rawChildRole) {
+              const roleStr = String(rawChildRole).trim().toUpperCase();
+              if (roleStr === 'LAWYER' || roleStr.includes('LAWYER')) {
+                childRole = 'LAWYER';
+              }
+            }
+            return {
+              id: child.id,
+              author: child.author?.name || 'Người dùng',
+              authorId: child.author?.id,
+              authorRole: childRole, // Store normalized role for comments
+              content: child.content,
+              createdAt: new Date(child.createdAt),
+              replyTo: null, // Can be enhanced later
+            };
+          }) : [],
+        };
+      });
       
       setAnswersData(mappedReplies);
     } catch (error) {
@@ -526,6 +553,9 @@ const QuestionDetail = ({ route, navigation }) => {
 
   const renderAnswer = (answer) => {
     const normalizedVote = answer.userVote ? answer.userVote.toLowerCase() : null;
+    // Normalize role to uppercase for comparison
+    const authorRole = answer.author?.role ? String(answer.author.role).toUpperCase() : null;
+    const isLawyer = authorRole === 'LAWYER';
 
     return (
     <View key={answer.id} style={styles.answerContainer}>
@@ -539,7 +569,10 @@ const QuestionDetail = ({ route, navigation }) => {
       <View style={styles.answerHeader}>
         <View style={styles.answerAuthor}>
           <TouchableOpacity 
-            style={styles.authorAvatar}
+            style={[
+              styles.authorAvatar,
+              isLawyer && styles.lawyerAvatar
+            ]}
             onPress={() => handleUserPress(answer.author.id || Math.random(), answer.author.name, answer.author.avatar)}
           >
             <Text style={styles.authorAvatarText}>
@@ -547,8 +580,20 @@ const QuestionDetail = ({ route, navigation }) => {
             </Text>
           </TouchableOpacity>
           <View style={styles.authorInfo}>
-            <Text style={styles.authorName}>{answer.author.name}</Text>
-            <Text style={styles.authorTitle}>{answer.author.title}</Text>
+            <View style={styles.authorNameRow}>
+              {isLawyer && (
+                <View style={styles.lawyerBadge}>
+                  <Ionicons name="shield-checkmark" size={12} color={COLORS.WHITE} />
+                  <Text style={styles.lawyerBadgeText}>Luật sư</Text>
+                </View>
+              )}
+              <Text style={[
+                styles.authorName,
+                isLawyer && styles.lawyerName
+              ]}>
+                {answer.author.name}
+              </Text>
+            </View>
             <Text style={styles.authorReputation}>{answer.author.reputation} điểm uy tín</Text>
           </View>
           {/* {answer.author.id !== currentUserId && (
@@ -646,6 +691,7 @@ const QuestionDetail = ({ route, navigation }) => {
               onReply={(author) => handleReplyToComment(answer.id, author)}
               onDelete={(commentId) => handleDeleteComment(answer.id, commentId)}
               onEdit={(comment) => handleEditComment(answer.id, comment)}
+              authorRole={comment.authorRole}
             />
           ))}
         </View>
@@ -1005,6 +1051,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  lawyerAvatar: {
+    backgroundColor: COLORS.BLUE,
+    borderWidth: 2,
+    borderColor: COLORS.BLUE_LIGHT,
+  },
   authorAvatarText: {
     color: COLORS.WHITE,
     fontSize: 14,
@@ -1013,10 +1064,35 @@ const styles = StyleSheet.create({
   authorInfo: {
     flex: 1,
   },
+  authorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  lawyerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.BLUE,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 2,
+  },
+  lawyerBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.WHITE,
+    marginLeft: 4,
+  },
   authorName: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.BLACK,
+  },
+  lawyerName: {
+    color: COLORS.BLUE,
+    fontWeight: '700',
   },
   authorTitle: {
     fontSize: 12,
