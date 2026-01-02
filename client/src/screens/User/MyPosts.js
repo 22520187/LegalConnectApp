@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../context/AuthContext';
 import UserService from '../../services/UserService';
+import ForumService from '../../services/ForumService';
 import COLORS from '../../constant/colors';
 import SCREENS from '../index';
 import QuestionList from '../../components/QuestionList/QuestionList';
@@ -34,14 +35,34 @@ const mapUserPostToQuestion = (post, author) => ({
     hasAcceptedAnswer: post.solved ?? false,
 });
 
+const mapBookmarkedPostToQuestion = (post) => ({
+    id: post.id,
+    title: post.title || '',
+    summary: createSummary(post.content || ''),
+    voteCount: (post.upvoteCount || 0) - (post.downvoteCount || 0),
+    answerCount: post.replyCount || 0,
+    viewCount: post.views || 0,
+    tags: post.category?.name ? [post.category.name] : (post.tags ? post.tags.split(',').filter(Boolean) : []),
+    author: {
+        id: post.author?.id ?? null,
+        name: post.author?.fullName || post.author?.name || 'Unknown',
+        avatar: post.author?.avatar || null,
+    },
+    createdAt: post.createdAt ? new Date(post.createdAt) : new Date(),
+    hasAcceptedAnswer: post.solved ?? false,
+});
+
 const MyPosts = ({ navigation }) => {
     const [activeTab, setActiveTab] = useState('myPosts');
     const [myPosts, setMyPosts] = useState([]);
-    const [bookmarkedPosts] = useState([]);
+    const [bookmarkedPosts, setBookmarkedPosts] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
+    const [bookmarkPage, setBookmarkPage] = useState(0);
+    const [bookmarkHasMore, setBookmarkHasMore] = useState(true);
+    const [loadingBookmarks, setLoadingBookmarks] = useState(false);
     const { user } = useAuth();
 
     const loadMyPosts = useCallback(async ({ pageIndex = 0, append = false } = {}) => {
@@ -74,25 +95,65 @@ const MyPosts = ({ navigation }) => {
         }
     }, [user]);
 
+    const loadBookmarkedPosts = useCallback(async ({ pageIndex = 0, append = false } = {}) => {
+        if (!user?.id) {
+            return Promise.resolve();
+        }
+
+        try {
+            const response = await ForumService.getUserBookmarks({
+                page: pageIndex,
+                size: 10,
+                sort: 'createdAt,desc',
+            });
+
+            const content = response?.content ?? [];
+            const mapped = content.map(post => mapBookmarkedPostToQuestion(post));
+
+            setBookmarkedPosts(prev => (append ? [...prev, ...mapped] : mapped));
+
+            const totalPages = response?.totalPages ?? 0;
+            setBookmarkHasMore(pageIndex < totalPages - 1);
+            setBookmarkPage(pageIndex + 1);
+        } catch (error) {
+            Toast.show({
+                type: 'error',
+                text1: 'Không thể tải bài viết đã bookmark',
+                text2: error.message || 'Vui lòng thử lại sau',
+            });
+            throw error;
+        }
+    }, [user]);
+
     useEffect(() => {
         if (activeTab === 'myPosts') {
             setLoading(true);
             loadMyPosts({ pageIndex: 0, append: false })
                 .catch(() => null)
                 .finally(() => setLoading(false));
+        } else if (activeTab === 'bookmarked') {
+            setLoadingBookmarks(true);
+            loadBookmarkedPosts({ pageIndex: 0, append: false })
+                .catch(() => null)
+                .finally(() => setLoadingBookmarks(false));
         }
-    }, [activeTab, user?.id, loadMyPosts]);
+    }, [activeTab, user?.id, loadMyPosts, loadBookmarkedPosts]);
 
     const handleAskQuestion = () => navigation.navigate(SCREENS.ASKQUESTION);
     const handleQuestionPress = question =>
         navigation.navigate(SCREENS.QUESTIONDETAIL, { question });
 
     const handleRefresh = () => {
-        if (activeTab !== 'myPosts') return;
         setRefreshing(true);
-        loadMyPosts({ pageIndex: 0, append: false })
-            .catch(() => null)
-            .finally(() => setRefreshing(false));
+        if (activeTab === 'myPosts') {
+            loadMyPosts({ pageIndex: 0, append: false })
+                .catch(() => null)
+                .finally(() => setRefreshing(false));
+        } else if (activeTab === 'bookmarked') {
+            loadBookmarkedPosts({ pageIndex: 0, append: false })
+                .catch(() => null)
+                .finally(() => setRefreshing(false));
+        }
     };
 
     const handleLoadMore = () => {
@@ -101,6 +162,11 @@ const MyPosts = ({ navigation }) => {
             loadMyPosts({ pageIndex: page, append: true })
                 .catch(() => null)
                 .finally(() => setLoading(false));
+        } else if (activeTab === 'bookmarked' && !loadingBookmarks && bookmarkHasMore) {
+            setLoadingBookmarks(true);
+            loadBookmarkedPosts({ pageIndex: bookmarkPage, append: true })
+                .catch(() => null)
+                .finally(() => setLoadingBookmarks(false));
         }
     };
 
@@ -172,8 +238,8 @@ const MyPosts = ({ navigation }) => {
                     onQuestionPress={handleQuestionPress}
                     onRefresh={handleRefresh}
                     refreshing={refreshing}
-                    onLoadMore={activeTab === 'myPosts' ? handleLoadMore : undefined}
-                    loading={activeTab === 'myPosts' ? loading : false}
+                    onLoadMore={handleLoadMore}
+                    loading={activeTab === 'myPosts' ? loading : loadingBookmarks}
                     emptyState={getEmptyMessage()}
                 />
             </View>

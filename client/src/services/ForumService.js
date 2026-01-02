@@ -402,6 +402,116 @@ export const createReply = async (postId, replyData) => {
     }
 };
 
+/**
+ * Toggle bookmark for a post
+ * @param {number} postId - Post ID
+ * @returns {Promise<Object>} Bookmark response (BookmarkDto)
+ */
+export const toggleBookmark = async (postId) => {
+    try {
+        const response = await apiClient.post(`/forum/posts/${postId}/bookmark`);
+        
+        if (response.status >= 200 && response.status < 300) {
+            // Backend returns ApiResponse<BookmarkDto>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error toggling bookmark:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get bookmark status for a post
+ * @param {number} postId - Post ID
+ * @returns {Promise<Object>} Bookmark status (BookmarkDto)
+ */
+export const getBookmarkStatus = async (postId) => {
+    try {
+        const response = await apiClient.get(`/forum/posts/${postId}/bookmark`);
+        
+        if (response.status >= 200 && response.status < 300) {
+            // Backend returns ApiResponse<BookmarkDto>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return response.data;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return { isBookmarked: false, bookmarkCount: 0 };
+        }
+    } catch (error) {
+        console.error('Error getting bookmark status:', error);
+        return { isBookmarked: false, bookmarkCount: 0 };
+    }
+};
+
+/**
+ * Get all bookmarked posts for current user
+ * @param {Object} options - Query options
+ * @param {number} options.page - Page number (default: 0)
+ * @param {number} options.size - Page size (default: 20)
+ * @param {string} options.sort - Sort field and direction (e.g., "createdAt,desc")
+ * @returns {Promise<Object>} Page object with bookmarked posts
+ */
+export const getUserBookmarks = async (options = {}) => {
+    try {
+        const { 
+            page = 0, 
+            size = 20, 
+            sort = 'createdAt,desc'
+        } = options;
+
+        const params = { page, size, sort };
+        const response = await apiClient.get('/forum/bookmarks', { params });
+
+        if (response.status >= 200 && response.status < 300) {
+            // Backend returns ApiResponse<Page<PostDto>>
+            if (response.data.success && response.data.data) {
+                return response.data.data;
+            }
+            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return { content: [], totalElements: 0, totalPages: 0, number: 0 };
+        }
+    } catch (error) {
+        console.error('Error fetching user bookmarks:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get bookmark count for a post (public endpoint)
+ * @param {number} postId - Post ID
+ * @returns {Promise<number>} Bookmark count
+ */
+export const getBookmarkCount = async (postId) => {
+    try {
+        const response = await apiClient.get(`/forum/posts/${postId}/bookmark/count`);
+        
+        if (response.status >= 200 && response.status < 300) {
+            // Backend returns ApiResponse<Long>
+            if (response.data.success && response.data.data !== undefined) {
+                return response.data.data;
+            }
+            return response.data || 0;
+        } else {
+            console.error('API returned non-success status:', response.status);
+            return 0;
+        }
+    } catch (error) {
+        console.error('Error getting bookmark count:', error);
+        return 0;
+    }
+};
+
 // Export default object with all methods
 const ForumService = {
     getAllPosts,
@@ -419,6 +529,10 @@ const ForumService = {
     getCategories,
     searchPosts,
     getPopularTags,
+    toggleBookmark,
+    getBookmarkStatus,
+    getUserBookmarks,
+    getBookmarkCount,
 };
 
 export default ForumService;

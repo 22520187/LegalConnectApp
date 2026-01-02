@@ -33,6 +33,8 @@ const QuestionDetail = ({ route, navigation }) => {
   });
   const [userVote, setUserVote] = useState(initialUserVote); // 'upvote', 'downvote', or null
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkCount, setBookmarkCount] = useState(0);
+  const [loadingBookmark, setLoadingBookmark] = useState(false);
   const netVoteCount = (voteStats.upvoteCount || 0) - (voteStats.downvoteCount || 0);
   const [expandedComments, setExpandedComments] = useState({});
   const [showCommentInput, setShowCommentInput] = useState({});
@@ -62,11 +64,27 @@ const QuestionDetail = ({ route, navigation }) => {
     }
   };
 
+  const loadBookmarkStatus = async () => {
+    if (!postId || !user) return;
+    try {
+      const bookmarkStatus = await ForumService.getBookmarkStatus(postId);
+      if (bookmarkStatus) {
+        setIsBookmarked(bookmarkStatus.isBookmarked || false);
+        setBookmarkCount(bookmarkStatus.bookmarkCount || 0);
+      }
+    } catch (error) {
+      console.error('Error loading bookmark status:', error);
+    }
+  };
+
   useEffect(() => {
     if (postId) {
       loadPostVotes();
+      if (user) {
+        loadBookmarkStatus();
+      }
     }
-  }, [postId]);
+  }, [postId, user]);
 
   // Load replies from API
   useEffect(() => {
@@ -217,12 +235,32 @@ const QuestionDetail = ({ route, navigation }) => {
     }
   };
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
-    Alert.alert(
-      'Bookmark',
-      isBookmarked ? 'Đã bỏ lưu câu hỏi' : 'Đã lưu câu hỏi'
-    );
+  const handleBookmark = async () => {
+    if (!user) {
+      Alert.alert('Thông báo', 'Vui lòng đăng nhập để lưu bài viết.');
+      return;
+    }
+
+    if (!postId) {
+      Alert.alert('Lỗi', 'Không tìm thấy bài viết');
+      return;
+    }
+
+    try {
+      setLoadingBookmark(true);
+      const result = await ForumService.toggleBookmark(postId);
+      
+      if (result) {
+        setIsBookmarked(result.isBookmarked || false);
+        setBookmarkCount(result.bookmarkCount || 0);
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      const message = error?.response?.data?.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.';
+      Alert.alert('Lỗi', message);
+    } finally {
+      setLoadingBookmark(false);
+    }
   };
 
   const handleUserPress = (userId, userName, userAvatar) => {
@@ -531,12 +569,17 @@ const QuestionDetail = ({ route, navigation }) => {
       <TouchableOpacity 
         style={[styles.actionButton, isBookmarked && styles.activeBookmark]}
         onPress={handleBookmark}
+        disabled={loadingBookmark}
       >
-        <Ionicons 
-          name={isBookmarked ? "bookmark" : "bookmark-outline"} 
-          size={24} 
-          color={isBookmarked ? COLORS.WHITE : COLORS.GRAY} 
-        />
+        {loadingBookmark ? (
+          <ActivityIndicator size="small" color={isBookmarked ? COLORS.WHITE : COLORS.GRAY} />
+        ) : (
+          <Ionicons 
+            name={isBookmarked ? "bookmark" : "bookmark-outline"} 
+            size={24} 
+            color={isBookmarked ? COLORS.WHITE : COLORS.GRAY} 
+          />
+        )}
       </TouchableOpacity>
 
       {!(question?.author?.id && currentUserId && question.author.id === currentUserId) && (

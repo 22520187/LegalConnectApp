@@ -29,8 +29,6 @@ const createSummary = (content = '', maxLength = 150) => {
     return plainText.substring(0, maxLength) + '...';
 };
 
-// Map PostDto to question format for UI
-// Optionally pass categories list to resolve category name when API doesn't include categoryName
 const mapPostToQuestion = (post, categories = []) => {
     const tagsArray = post.tags ? (Array.isArray(post.tags) ? post.tags : Array.from(post.tags)) : [];
 
