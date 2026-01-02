@@ -69,7 +69,7 @@ const Home = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
 
     // Prevent stale requests from overwriting new tab results
     const requestSeqRef = useRef(0);
@@ -225,6 +225,25 @@ const Home = ({ navigation }) => {
         navigation.navigate('Notification');
     };
 
+    const handleLogout = () => {
+        Alert.alert(
+            'Đăng xuất',
+            'Bạn có chắc chắn muốn đăng xuất?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Đăng xuất',
+                    style: 'destructive',
+                    onPress: async () => {
+                        // Logout sẽ luôn thành công vì đã xóa local storage
+                        // API call có thể fail nếu session hết hạn nhưng không ảnh hưởng
+                        await logout();
+                    },
+                },
+            ]
+        );
+    };
+
     const handleQuestionPress = (question) => {
         navigation.navigate('QuestionDetail', { question });
     };
@@ -312,6 +331,7 @@ const Home = ({ navigation }) => {
                     onSearch={handleSearch}
                     onNotification={handleNotification}
                     user={userDisplay}
+                    onLogout={handleLogout}
                 />
                 
                 <FilterTabs

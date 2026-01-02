@@ -124,6 +124,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setLoading(true);
+      // Logout luôn thành công vì AuthService đã xóa local storage trước
       await AuthService.logout();
       setUser(null);
       setIsAuthenticated(false);
@@ -133,10 +134,15 @@ export const AuthProvider = ({ children }) => {
         text2: 'Hẹn gặp lại bạn!',
       });
     } catch (error) {
-      console.error('Logout error:', error);
-      // Vẫn logout local ngay cả khi API thất bại
+      // Fallback: vẫn logout local ngay cả khi có lỗi không mong đợi
+      console.log('Logout completed (local cleanup):', error.message);
       setUser(null);
       setIsAuthenticated(false);
+      Toast.show({
+        type: 'success',
+        text1: 'Đăng xuất thành công',
+        text2: 'Hẹn gặp lại bạn!',
+      });
     } finally {
       setLoading(false);
     }

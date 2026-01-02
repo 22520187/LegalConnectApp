@@ -79,22 +79,25 @@ class AuthService {
 
   // Đăng xuất
   async logout() {
+    // Luôn xóa local storage trước, sau đó mới gọi API
+    // Điều này đảm bảo logout luôn thành công ngay cả khi API fail
+    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem('userToken');
+    await AsyncStorage.removeItem('isAuthenticated');
+    
     try {
+      // Thử gọi API logout (có thể fail nếu session đã hết hạn, nhưng không sao)
       const response = await apiClient.post('/auth/logout');
-
-      // Xóa thông tin local storage
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('isAuthenticated');
-      
       return this.handleResponse(response);
     } catch (error) {
-      console.error('Logout error:', error);
-      // Vẫn xóa local storage ngay cả khi API call thất bại
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('isAuthenticated');
-      throw error;
+      // Log error nhưng không throw - logout local đã thành công
+      // API có thể fail nếu session đã hết hạn, nhưng điều đó không quan trọng
+      console.log('Logout API call failed (session may have expired):', error.message);
+      // Trả về success vì logout local đã thành công
+      return {
+        success: true,
+        message: 'Logout successful'
+      };
     }
   }
 

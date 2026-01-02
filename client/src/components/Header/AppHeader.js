@@ -7,21 +7,79 @@ import {
   Image,
   Modal,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
+import UserService from '../../services/UserService';
 
-const AppHeader = ({ onSearch, onNotification, user }) => {
+const AppHeader = ({ onSearch, onNotification, user, onLogout }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+  const [loadingUserInfo, setLoadingUserInfo] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
 
-  const handleAvatarPress = () => {
+  const handleAvatarPress = async () => {
     setShowUserMenu(true);
+    // Call API to get latest user info when menu opens
+    await loadUserInfo();
   };
 
-  const handleMenuAction = (action) => {
+  const loadUserInfo = async () => {
+    try {
+      if (!user?.id && !user?.userId) {
+        // Use current user data if no userId
+        setUserInfo({
+          name: user?.fullName || user?.name || 'User',
+          avatar: user?.avatar || null,
+        });
+        return;
+      }
+
+      setLoadingUserInfo(true);
+      setAvatarError(false); // Reset avatar error when loading new info
+      const userId = user.id || user.userId;
+      const profileData = await UserService.getUserProfile(userId);
+      
+      if (profileData) {
+        // Validate avatar URL - must be a non-empty string
+        const avatarUrl = profileData.avatar;
+        const isValidAvatar = avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim().length > 0;
+        
+        console.log('Loaded user profile:', {
+          name: profileData.fullName,
+          avatar: avatarUrl,
+          isValidAvatar: isValidAvatar
+        });
+        
+        setUserInfo({
+          name: profileData.fullName || user.fullName || user.name || 'User',
+          avatar: isValidAvatar ? avatarUrl : (user?.avatar || null),
+        });
+      } else {
+        // Fallback to current user data if API returns null
+        setUserInfo({
+          name: user?.fullName || user?.name || 'User',
+          avatar: user?.avatar || null,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user info:', error);
+      // Fallback to current user data if API fails
+      setUserInfo({
+        name: user?.fullName || user?.name || 'User',
+        avatar: user?.avatar || null,
+      });
+    } finally {
+      setLoadingUserInfo(false);
+    }
+  };
+
+  const handleLogout = () => {
     setShowUserMenu(false);
-    // Handle menu actions here
-    console.log(`${action} clicked`);
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   return (
@@ -68,37 +126,81 @@ const AppHeader = ({ onSearch, onNotification, user }) => {
         visible={showUserMenu}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowUserMenu(false)}
+        onRequestClose={() => {
+          setShowUserMenu(false);
+          setUserInfo(null); // Reset user info when closing
+          setAvatarError(false); // Reset avatar error when closing
+        }}
       >
         <Pressable 
           style={styles.modalOverlay} 
-          onPress={() => setShowUserMenu(false)}
+          onPress={() => {
+            setShowUserMenu(false);
+            setUserInfo(null); // Reset user info when closing
+            setAvatarError(false); // Reset avatar error when closing
+          }}
         >
           <View style={styles.userMenu}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleMenuAction('Profile')}
-            >
-              <Ionicons name="person-outline" size={20} color={COLORS.GRAY_DARK} />
-              <Text style={styles.menuText}>Profile</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => handleMenuAction('Settings')}
-            >
-              <Ionicons name="settings-outline" size={20} color={COLORS.GRAY_DARK} />
-              <Text style={styles.menuText}>Settings</Text>
-            </TouchableOpacity>
+            {/* User Info Section */}
+            <View style={styles.userInfoSection}>
+              {loadingUserInfo ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={COLORS.BLUE} />
+                </View>
+              ) : (
+                <>
+                  {/* Avatar */}
+                  {(() => {
+                    // Try userInfo first, then fallback to user prop
+                    const avatarUrl = userInfo?.avatar || user?.avatar;
+                    const displayName = userInfo?.name || user?.fullName || user?.name || 'User';
+                    const isValidAvatar = avatarUrl && 
+                                         typeof avatarUrl === 'string' && 
+                                         avatarUrl.trim().length > 0 && 
+                                         !avatarError;
+                    
+                    if (isValidAvatar) {
+                      return (
+                        <Image 
+                          source={{ uri: avatarUrl }} 
+                          style={styles.menuAvatar}
+                          onError={(error) => {
+                            console.log('Avatar load error:', error.nativeEvent?.error || 'Unknown error');
+                            console.log('Failed avatar URL:', avatarUrl);
+                            setAvatarError(true);
+                          }}
+                          onLoad={() => {
+                            console.log('Avatar loaded successfully:', avatarUrl);
+                          }}
+                        />
+                      );
+                    }
+                    
+                    return (
+                      <View style={styles.menuDefaultAvatar}>
+                        <Text style={styles.menuAvatarText}>
+                          {displayName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                  {/* User Name - below avatar */}
+                  <Text style={styles.userNameText} numberOfLines={1}>
+                    {userInfo?.name || user?.fullName || user?.name || 'User'}
+                  </Text>
+                </>
+              )}
+            </View>
 
             <View style={styles.menuDivider} />
 
+            {/* Logout Button */}
             <TouchableOpacity
               style={styles.menuItem}
-              onPress={() => handleMenuAction('Logout')}
+              onPress={handleLogout}
             >
               <Ionicons name="log-out-outline" size={20} color={COLORS.RED} />
-              <Text style={[styles.menuText, { color: COLORS.RED }]}>Logout</Text>
+              <Text style={[styles.menuText, { color: COLORS.RED }]}>Đăng xuất</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -232,6 +334,42 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.GRAY_BG,
     marginVertical: 4,
+  },
+  userInfoSection: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  loadingContainer: {
+    paddingVertical: 8,
+  },
+  menuAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginBottom: 8,
+    backgroundColor: COLORS.GRAY_BG,
+  },
+  menuDefaultAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.BLUE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  menuAvatarText: {
+    color: COLORS.WHITE,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  userNameText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.BLACK,
+    textAlign: 'center',
   },
 });
 
