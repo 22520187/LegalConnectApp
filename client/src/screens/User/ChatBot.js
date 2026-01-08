@@ -8,39 +8,187 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Modal,
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
-import { ChatMessage, ChatInput, PDFPicker } from '../../components';
+import { ChatMessage, ChatInput, PDFPicker, ConversationList } from '../../components';
+import { askQuestion } from '../../services/AIQAService';
+import {
+  createConversation,
+  getUserConversations,
+  getConversationMessages,
+  sendMessage as sendMessageToBackend,
+  deleteConversation,
+  updateConversationTitle,
+} from '../../services/ChatService';
+import { useAuth } from '../../context/AuthContext';
 
 const ChatBot = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('normal'); // 'normal' hoặc 'pdf'
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('normal');
   const [messages, setMessages] = useState([]);
   const [pdfMessages, setPdfMessages] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [showConversationsModal, setShowConversationsModal] = useState(false);
+  const [refreshingConversations, setRefreshingConversations] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renamingConversationId, setRenamingConversationId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
   const scrollViewRef = useRef(null);
 
-  // Khởi tạo tin nhắn chào mừng
+  // Load conversations khi component mount
   useEffect(() => {
-    const welcomeMessage = {
-      id: 1,
-      message: "Xin chào! Tôi là chatbot hỗ trợ pháp lý. Tôi có thể giúp bạn giải đáp các thắc mắc về luật pháp. Hãy đặt câu hỏi của bạn!",
-      isUser: false,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    };
+    if (user) {
+      loadConversations();
+    }
+  }, [user]);
 
+  // Refresh conversations khi mở modal
+  useEffect(() => {
+    if (showConversationsModal && user) {
+      loadConversations(false);
+    }
+  }, [showConversationsModal]);
+
+  // Load messages khi conversation thay đổi
+  useEffect(() => {
+    if (currentConversationId) {
+      loadMessages(currentConversationId);
+    } else {
+      // Nếu không có conversation, hiển thị welcome message
+      const welcomeMessage = {
+        id: 1,
+        message: "Xin chào! Tôi là chatbot hỗ trợ pháp lý. Tôi có thể giúp bạn giải đáp các thắc mắc về luật pháp. Hãy đặt câu hỏi của bạn!",
+        isUser: false,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [currentConversationId]);
+
+  // Khởi tạo tin nhắn chào mừng cho PDF tab
+  useEffect(() => {
     const pdfWelcomeMessage = {
       id: 1,
       message: "Chào bạn! Ở đây bạn có thể tải lên file PDF và tôi sẽ giúp bạn giải đáp các câu hỏi dựa trên nội dung file đó. Hãy chọn file PDF trước nhé!",
       isUser: false,
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     };
-
-    setMessages([welcomeMessage]);
     setPdfMessages([pdfWelcomeMessage]);
   }, []);
+
+  const loadConversations = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setIsLoadingConversations(true);
+      } else {
+        setRefreshingConversations(true);
+      }
+      const convs = await getUserConversations();
+      setConversations(convs);
+      
+      // Nếu có conversations và chưa có conversation được chọn, chọn conversation đầu tiên
+      if (convs.length > 0 && !currentConversationId) {
+        setCurrentConversationId(convs[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Lỗi', 'Không thể tải danh sách cuộc trò chuyện. Vui lòng thử lại.');
+    } finally {
+      setIsLoadingConversations(false);
+      setRefreshingConversations(false);
+    }
+  };
+
+  const loadMessages = async (conversationId) => {
+    try {
+      setIsLoadingMessages(true);
+      const msgs = await getConversationMessages(conversationId);
+      // Convert messages từ backend format sang UI format
+      const formattedMessages = msgs.map(msg => ({
+        id: msg.id,
+        message: msg.content,
+        isUser: msg.role === 'USER',
+        timestamp: new Date(msg.createdAt).toLocaleTimeString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+      }));
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const createNewConversation = async () => {
+    try {
+      const newConv = await createConversation();
+      setCurrentConversationId(newConv.id);
+      setConversations(prev => [newConv, ...prev]);
+      setMessages([]);
+      setShowConversationsModal(false);
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      Alert.alert('Lỗi', 'Không thể tạo cuộc trò chuyện mới. Vui lòng thử lại.');
+    }
+  };
+
+  const handleSelectConversation = (conversation) => {
+    setCurrentConversationId(conversation.id);
+    setShowConversationsModal(false);
+  };
+
+  const handleEditConversationTitle = (conversation) => {
+    setRenamingConversationId(conversation.id);
+    setEditingTitle(conversation.title || '');
+    setShowRenameModal(true);
+  };
+
+  const handleDeleteConversation = async (conversationId) => {
+    Alert.alert(
+      'Xóa cuộc trò chuyện',
+      'Bạn có chắc chắn muốn xóa cuộc trò chuyện này?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteConversation(conversationId);
+              // Nếu đang xem conversation bị xóa, chuyển sang conversation khác hoặc tạo mới
+              if (currentConversationId === conversationId) {
+                const remaining = conversations.filter(c => c.id !== conversationId);
+                if (remaining.length > 0) {
+                  setCurrentConversationId(remaining[0].id);
+                } else {
+                  setCurrentConversationId(null);
+                  setMessages([]);
+                }
+              }
+              // Cập nhật danh sách conversations
+              setConversations(prev => prev.filter(c => c.id !== conversationId));
+            } catch (error) {
+              console.error('Error deleting conversation:', error);
+              Alert.alert('Lỗi', 'Không thể xóa cuộc trò chuyện. Vui lòng thử lại.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -49,69 +197,111 @@ const ChatBot = ({ navigation }) => {
   };
 
   const handleSendMessage = async (message) => {
-    const currentMessages = activeTab === 'normal' ? messages : pdfMessages;
-    const setCurrentMessages = activeTab === 'normal' ? setMessages : setPdfMessages;
+    if (activeTab !== 'normal') {
+      // Logic cho PDF Q&A
+      if (!selectedFile) {
+        const botMessage = {
+          id: Date.now() + 1,
+          message: "Bạn cần chọn file PDF trước khi đặt câu hỏi. Vui lòng tải lên file PDF để tôi có thể hỗ trợ bạn tốt hơn.",
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setPdfMessages(prev => [...prev, botMessage]);
+        scrollToBottom();
+      } else {
+        // TODO: Implement PDF Q&A API call
+        const botMessage = {
+          id: Date.now() + 1,
+          message: "Tính năng hỏi đáp PDF đang được phát triển. Vui lòng sử dụng tab 'Hỏi đáp thường'.",
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setPdfMessages(prev => [...prev, botMessage]);
+        scrollToBottom();
+      }
+      return;
+    }
 
-    // Thêm tin nhắn của user
+    // Đảm bảo có conversation
+    let convId = currentConversationId;
+    if (!convId) {
+      try {
+        const newConv = await createConversation();
+        convId = newConv.id;
+        setCurrentConversationId(convId);
+        setConversations(prev => [newConv, ...prev]);
+        // Xóa welcome message khi tạo conversation mới
+        setMessages([]);
+      } catch (error) {
+        Alert.alert('Lỗi', 'Không thể tạo cuộc trò chuyện mới. Vui lòng thử lại.');
+        return;
+      }
+    }
+
+    // Thêm tin nhắn của user vào UI ngay
     const userMessage = {
       id: Date.now(),
       message: message,
       isUser: true,
       timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     };
-
-    setCurrentMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     scrollToBottom();
 
-    // Giả lập phản hồi từ bot (trong thực tế sẽ gọi API)
-    setTimeout(() => {
-      let botResponse = "";
-      
-      if (activeTab === 'normal') {
-        // Logic cho tab hỏi đáp bình thường
-        botResponse = generateNormalResponse(message);
-      } else {
-        // Logic cho tab hỏi đáp dựa trên PDF
-        if (!selectedFile) {
-          botResponse = "Bạn cần chọn file PDF trước khi đặt câu hỏi. Vui lòng tải lên file PDF để tôi có thể hỗ trợ bạn tốt hơn.";
-        } else {
-          botResponse = generatePDFResponse(message, selectedFile.name);
-        }
-      }
+    try {
+      // Lưu user message vào backend
+      await sendMessageToBackend(convId, message, 'USER');
 
-      const botMessage = {
+      // Lấy lịch sử chat (6 tin nhắn gần nhất, loại bỏ welcome message)
+      const recentHistory = messages
+        .filter(msg => msg.id !== 1) // Loại bỏ welcome message
+        .slice(-6)
+        .map(msg => ({
+          role: msg.isUser ? 'user' : 'assistant',
+          content: msg.message
+        }));
+
+      // Gọi AI API
+      const response = await askQuestion(message, 5, convId, recentHistory);
+
+      if (response.success) {
+        // Lưu AI response vào backend
+        await sendMessageToBackend(convId, response.answer, 'ASSISTANT');
+
+        // Thêm AI message vào UI
+        const botMessage = {
+          id: Date.now() + 1,
+          message: response.answer,
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          sources: response.sources,
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        throw new Error('Không nhận được phản hồi từ AI');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      const errorMessage = {
         id: Date.now() + 1,
-        message: botResponse,
+        message: error.message || 'Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn. Vui lòng thử lại sau.',
         isUser: false,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       };
-
-      setCurrentMessages(prev => [...prev, botMessage]);
+      setMessages(prev => [...prev, errorMessage]);
+      
+      if (error.message.includes('kết nối')) {
+        Alert.alert(
+          'Lỗi kết nối',
+          'Không thể kết nối đến server AI. Vui lòng kiểm tra:\n- Kết nối mạng\n- Server AI đang chạy\n- URL API đúng'
+        );
+      }
+    } finally {
       setIsLoading(false);
       scrollToBottom();
-    }, 1500);
-  };
-
-  const generateNormalResponse = (question) => {
-    // Giả lập phản hồi dựa trên từ khóa
-    const lowerQuestion = question.toLowerCase();
-    
-    if (lowerQuestion.includes('hợp đồng')) {
-      return "Về hợp đồng: Hợp đồng là thỏa thuận giữa các bên về việc xác lập, thay đổi hoặc chấm dứt quyền và nghĩa vụ dân sự. Để hợp đồng có hiệu lực, cần đảm bảo các điều kiện: các bên có năng lực hành vi dân sự, nội dung không vi phạm pháp luật, mục đích không trái đạo đức xã hội.";
-    } else if (lowerQuestion.includes('thuê nhà') || lowerQuestion.includes('cho thuê')) {
-      return "Về thuê nhà: Hợp đồng thuê nhà cần có các nội dung chính như địa chỉ nhà, thời hạn thuê, giá thuê, quyền và nghĩa vụ của các bên. Bên cho thuê có nghĩa vụ giao nhà đúng thỏa thuận, bảo đảm sử dụng ổn định. Bên thuê có nghĩa vụ trả tiền đúng hạn, sử dụng đúng mục đích.";
-    } else if (lowerQuestion.includes('lao động') || lowerQuestion.includes('việc làm')) {
-      return "Về lao động: Hợp đồng lao động là thỏa thuận giữa người lao động và người sử dụng lao động về công việc có trả lương. Các quyền cơ bản của người lao động bao gồm: được trả lương đầy đủ, được nghỉ phép, được bảo hiểm xã hội, được bảo hộ lao động.";
-    } else if (lowerQuestion.includes('ly hôn') || lowerQuestion.includes('hôn nhân')) {
-      return "Về ly hôn: Ly hôn là việc chấm dứt hôn nhân theo quyết định của Tòa án. Có thể ly hôn theo thỏa thuận hoặc đơn phương. Cần chuẩn bị đơn khởi kiện, giấy tờ liên quan đến tài sản, con cái. Tòa án sẽ tiến hành hòa giải trước khi ra quyết định.";
-    } else {
-      return "Cảm ơn bạn đã đặt câu hỏi. Đây là một vấn đề pháp lý phức tạp cần được xem xét cụ thể. Tôi khuyên bạn nên tham khảo thêm ý kiến của luật sư chuyên nghiệp để có lời khuyên chính xác nhất. Bạn có thể chia sẻ thêm chi tiết để tôi hỗ trợ tốt hơn không?";
     }
-  };
-
-  const generatePDFResponse = (question, fileName) => {
-    return `Dựa trên nội dung file "${fileName}" mà bạn đã tải lên, tôi hiểu câu hỏi của bạn về: "${question}". Đây là phân tích dựa trên tài liệu:\n\n[Trong thực tế, đây sẽ là phản hồi được xử lý từ nội dung PDF thực tế thông qua AI]\n\nNếu bạn cần làm rõ thêm điều gì trong tài liệu, hãy hỏi tôi nhé!`;
   };
 
   const handleFileSelected = (file) => {
@@ -150,19 +340,43 @@ const ChatBot = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      {/* Header */}
+      {/* Header với nút tạo conversation mới */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
+          <Ionicons name="arrow-back" size={24} color={COLORS.BLACK} />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>ChatBot Pháp lý</Text>
-          <Text style={styles.subtitle}>Hỗ trợ tư vấn 24/7</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Ionicons name="chatbubble-ellipses" size={24} color={COLORS.BLUE} />
+        <TouchableOpacity
+          style={styles.headerContent}
+          onPress={() => setShowConversationsModal(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.title} numberOfLines={1}>
+            {currentConversationId 
+              ? conversations.find(c => c.id === currentConversationId)?.title || 'ChatBot Pháp lý'
+              : 'ChatBot Pháp lý'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {conversations.length > 0 
+              ? `${conversations.length} cuộc trò chuyện` 
+              : 'Hỗ trợ tư vấn 24/7'}
+          </Text>
+        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowConversationsModal(true)}
+          >
+            <Ionicons name="list-outline" size={24} color={COLORS.BLUE} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={createNewConversation}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={COLORS.BLUE} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -179,15 +393,7 @@ const ChatBot = ({ navigation }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* PDF Picker (chỉ hiện ở tab PDF) */}
-        {activeTab === 'pdf' && !selectedFile && (
-          <PDFPicker
-            onFileSelected={handleFileSelected}
-            selectedFile={selectedFile}
-          />
-        )}
-
-        {/* PDF File Info (hiện khi đã chọn file ở tab PDF) */}
-        {activeTab === 'pdf' && selectedFile && (
+        {activeTab === 'pdf' && (
           <PDFPicker
             onFileSelected={handleFileSelected}
             selectedFile={selectedFile}
@@ -201,22 +407,29 @@ const ChatBot = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
         >
-          {getCurrentMessages().map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg.message}
-              isUser={msg.isUser}
-              timestamp={msg.timestamp}
-            />
-          ))}
-          
-          {/* Loading indicator */}
-          {isLoading && (
+          {isLoadingMessages ? (
             <View style={styles.loadingContainer}>
-              <View style={styles.loadingBubble}>
-                <Text style={styles.loadingText}>Đang nhập...</Text>
-              </View>
+              <ActivityIndicator size="large" color={COLORS.BLUE} />
             </View>
+          ) : (
+            <>
+              {getCurrentMessages().map((msg) => (
+                <ChatMessage
+                  key={msg.id}
+                  message={msg.message}
+                  isUser={msg.isUser}
+                  timestamp={msg.timestamp}
+                />
+              ))}
+              
+              {isLoading && (
+                <View style={styles.loadingContainer}>
+                  <View style={styles.loadingBubble}>
+                    <Text style={styles.loadingText}>Đang nhập...</Text>
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
 
@@ -231,6 +444,111 @@ const ChatBot = ({ navigation }) => {
           disabled={activeTab === 'pdf' && !selectedFile}
         />
       </KeyboardAvoidingView>
+
+      {/* Conversations Modal */}
+      <Modal
+        visible={showConversationsModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowConversationsModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top']}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Cuộc trò chuyện</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowConversationsModal(false)}
+            >
+              <Ionicons name="close" size={28} color={COLORS.BLACK} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalContent}>
+            <ConversationList
+              conversations={conversations}
+              currentConversationId={currentConversationId}
+              onSelectConversation={handleSelectConversation}
+              onDeleteConversation={handleDeleteConversation}
+                onEditConversation={handleEditConversationTitle}
+              isLoading={isLoadingConversations}
+              onRefresh={() => loadConversations(false)}
+              refreshing={refreshingConversations}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.newConversationButton}
+            onPress={createNewConversation}
+          >
+            <Ionicons name="add-circle" size={24} color={COLORS.WHITE} />
+            <Text style={styles.newConversationButtonText}>Tạo cuộc trò chuyện mới</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Rename Conversation Modal */}
+      <Modal
+        visible={showRenameModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => !isRenaming && setShowRenameModal(false)}
+      >
+        <View style={styles.renameOverlay}>
+          <View style={styles.renameContainer}>
+            <Text style={styles.renameTitle}>Đổi tên cuộc trò chuyện</Text>
+            <Text style={styles.renameLabel}>Tiêu đề</Text>
+            <View style={styles.renameInputWrapper}>
+              <TextInput
+                style={styles.renameInput}
+                placeholder="Nhập tiêu đề mới"
+                value={editingTitle}
+                onChangeText={setEditingTitle}
+                editable={!isRenaming}
+              />
+            </View>
+            <View style={styles.renameActions}>
+              <TouchableOpacity
+                style={[styles.renameButton, styles.renameCancelButton]}
+                onPress={() => !isRenaming && setShowRenameModal(false)}
+                disabled={isRenaming}
+              >
+                <Text style={styles.renameCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.renameButton, styles.renameSaveButton]}
+                onPress={async () => {
+                  if (!editingTitle.trim()) {
+                    Alert.alert('Lỗi', 'Tiêu đề không được để trống.');
+                    return;
+                  }
+                  try {
+                    setIsRenaming(true);
+                    const updated = await updateConversationTitle(
+                      renamingConversationId,
+                      editingTitle.trim()
+                    );
+                    // Cập nhật danh sách conversations trong state
+                    setConversations(prev =>
+                      prev.map(c =>
+                        c.id === renamingConversationId ? { ...c, title: updated.title } : c
+                      )
+                    );
+                    setShowRenameModal(false);
+                  } catch (error) {
+                    console.error('Error updating title:', error);
+                    Alert.alert('Lỗi', 'Không thể cập nhật tiêu đề. Vui lòng thử lại.');
+                  } finally {
+                    setIsRenaming(false);
+                  }
+                }}
+                disabled={isRenaming}
+              >
+                <Text style={styles.renameSaveText}>
+                  {isRenaming ? 'Đang lưu...' : 'Lưu'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -255,6 +573,15 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flex: 1,
+    paddingRight: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   title: {
     fontSize: 20,
@@ -266,8 +593,9 @@ const styles = StyleSheet.create({
     color: COLORS.GRAY,
     marginTop: 2,
   },
-  headerRight: {
+  newChatButton: {
     padding: 4,
+    marginLeft: 8,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -310,6 +638,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingHorizontal: 16,
     marginVertical: 4,
+    alignItems: 'center',
   },
   loadingBubble: {
     backgroundColor: COLORS.WHITE,
@@ -326,6 +655,113 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.GRAY,
     fontStyle: 'italic',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.BG,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.WHITE,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.GRAY_BG,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.BLACK,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalContent: {
+    flex: 1,
+  },
+  newConversationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.BLUE,
+    marginHorizontal: 16,
+    marginVertical: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  newConversationButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.WHITE,
+    marginLeft: 8,
+  },
+  renameOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  renameContainer: {
+    width: '100%',
+    backgroundColor: COLORS.WHITE,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  renameTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.BLACK,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  renameLabel: {
+    fontSize: 14,
+    color: COLORS.GRAY_DARK,
+    marginBottom: 6,
+  },
+  renameInputWrapper: {
+    borderWidth: 1,
+    borderColor: COLORS.GRAY_BG,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: COLORS.BG,
+  },
+  renameInput: {
+    fontSize: 15,
+    color: COLORS.BLACK,
+    paddingVertical: 6,
+  },
+  renameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  renameButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  renameCancelButton: {
+    backgroundColor: COLORS.GRAY_BG,
+  },
+  renameSaveButton: {
+    backgroundColor: COLORS.BLUE,
+  },
+  renameCancelText: {
+    fontSize: 14,
+    color: COLORS.BLACK,
+    fontWeight: '500',
+  },
+  renameSaveText: {
+    fontSize: 14,
+    color: COLORS.WHITE,
+    fontWeight: '600',
   },
 });
 
