@@ -364,14 +364,17 @@ const ChatScreen = () => {
       {/* Messages */}
       <KeyboardAvoidingView 
         style={styles.chatContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {messages.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -489,7 +492,10 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+  },
+  messagesContent: {
     paddingVertical: 16,
+    flexGrow: 1,
   },
   loadingContainer: {
     flex: 1,

@@ -12,7 +12,7 @@ import {
   Modal,
   TextInput
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
 import { ChatMessage, ChatInput, PDFPicker, ConversationList } from '../../components';
@@ -36,6 +36,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const ChatBot = ({ navigation }) => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('normal');
   const [messages, setMessages] = useState([]);
   const [pdfMessages, setPdfMessages] = useState([]);
@@ -612,8 +613,9 @@ const ChatBot = ({ navigation }) => {
       {/* Chat Content */}
       <KeyboardAvoidingView 
         style={styles.chatContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         {/* PDF Picker (chỉ hiện ở tab PDF) */}
         {activeTab === 'pdf' && (
@@ -627,8 +629,11 @@ const ChatBot = ({ navigation }) => {
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {isLoadingMessages ? (
             <View style={styles.loadingContainer}>
@@ -853,10 +858,16 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     flex: 1,
+    ...(Platform.OS === 'android' && {
+      paddingBottom: 0,
+    }),
   },
   messagesContainer: {
     flex: 1,
+  },
+  messagesContent: {
     paddingVertical: 16,
+    flexGrow: 1,
   },
   loadingContainer: {
     paddingHorizontal: 16,
