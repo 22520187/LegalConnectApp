@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import COLORS from '../../constant/colors';
 import UserService from '../../services/UserService';
 
-const AppHeader = ({ onSearch, onNotification, user, onLogout }) => {
+const AppHeader = ({ onSearch, onNotification, user, onLogout, notificationCount = 0 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(false);
@@ -101,10 +101,14 @@ const AppHeader = ({ onSearch, onNotification, user, onLogout }) => {
         {/* Notification Icon */}
         <TouchableOpacity style={styles.actionButton} onPress={onNotification}>
           <Ionicons name="notifications-outline" size={24} color={COLORS.GRAY_DARK} />
-          {/* Notification Badge */}
-          <View style={styles.notificationBadge}>
-            <Text style={styles.badgeText}>3</Text>
-          </View>
+          {/* Notification Badge - chỉ hiển thị khi có thông báo chưa đọc */}
+          {notificationCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.badgeText}>
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* User Avatar */}

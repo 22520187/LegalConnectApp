@@ -98,12 +98,23 @@ const Notification = ({ navigation }) => {
           setNotifications(mappedNotifications);
         }
         
-        setTotalElements(response.totalElements || 0);
-        setHasMore(!response.last);
-        setPage(pageNum);
+        // Update totalElements - Spring Page returns totalElements
+        const total = response.totalElements || 0;
+        setTotalElements(total);
+        
+        // Check if there are more pages
+        // Spring Page: number (0-based), totalPages
+        const currentPage = response.number !== undefined ? response.number : pageNum;
+        const totalPages = response.totalPages || 0;
+        const hasMorePages = currentPage < totalPages - 1;
+        setHasMore(hasMorePages);
+        // Set next page number for pagination
+        setPage(currentPage + 1);
       } else {
         if (!append) {
           setNotifications([]);
+          setTotalElements(0);
+          setHasMore(false);
         }
       }
     } catch (error) {
@@ -112,6 +123,8 @@ const Notification = ({ navigation }) => {
       Alert.alert('Lỗi', 'Không thể tải thông báo. Vui lòng thử lại.');
       if (!append) {
         setNotifications([]);
+        setTotalElements(0);
+        setHasMore(false);
       }
     } finally {
       if (mountedRef.current) {
@@ -153,6 +166,8 @@ const Notification = ({ navigation }) => {
       setActiveTab(tab);
       setPage(0);
       setHasMore(true);
+      setNotifications([]); // Clear current notifications when switching tabs
+      setTotalElements(0); // Reset total elements
     }
   }, [activeTab]);
 
@@ -167,7 +182,8 @@ const Notification = ({ navigation }) => {
   const handleLoadMore = useCallback(() => {
     if (!loadingRef.current && !loadingMoreRef.current && !loading && hasMore && notifications.length > 0) {
       loadingMoreRef.current = true;
-      loadNotifications(page + 1, true).finally(() => {
+      // Use current page number (which is already set to next page after previous load)
+      loadNotifications(page, true).finally(() => {
         loadingMoreRef.current = false;
       });
     }
@@ -179,13 +195,24 @@ const Notification = ({ navigation }) => {
       try {
         await NotificationService.markAsRead(notification.id);
         if (mountedRef.current) {
-          setNotifications(prev => 
-            prev.map(n => 
+          // Update local state
+          setNotifications(prev => {
+            const updated = prev.map(n => 
               n.id === notification.id ? { ...n, isRead: true } : n
-            )
-          );
-          // Update unread count
-          loadUnreadCount();
+            );
+            // If on unread tab, remove the notification from list
+            if (activeTab === 'unread') {
+              return updated.filter(n => !n.isRead);
+            }
+            return updated;
+          });
+          
+          // Update unread count and reload if on unread tab to get correct totalElements
+          await loadUnreadCount();
+          if (activeTab === 'unread') {
+            // Reload to get updated totalElements from server
+            await loadNotifications(0, false);
+          }
         }
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -210,24 +237,26 @@ const Notification = ({ navigation }) => {
           break;
       }
     }
-  }, [loadUnreadCount]);
+  }, [loadUnreadCount, activeTab, loadNotifications]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     try {
       const success = await NotificationService.markAllAsRead();
       if (success && mountedRef.current) {
-        // Update all notifications to read
-        setNotifications(prev => 
-          prev.map(n => ({ ...n, isRead: true }))
-        );
+        // Update unread count
         setUnreadCount(0);
+        
+        // Reload notifications to get fresh data
+        await loadNotifications(0, false);
+        await loadUnreadCount();
+        
         Alert.alert('Thành công', 'Đã đánh dấu tất cả thông báo là đã đọc');
       }
     } catch (error) {
       console.error('Error marking all as read:', error);
       Alert.alert('Lỗi', 'Không thể đánh dấu tất cả là đã đọc. Vui lòng thử lại.');
     }
-  }, []);
+  }, [loadNotifications, loadUnreadCount]);
 
   const formatTimeAgo = (date) => {
     const now = new Date();
@@ -339,9 +368,10 @@ const Notification = ({ navigation }) => {
               />
             }
             onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.3}
-            removeClippedSubviews={true}
+            onEndReachedThreshold={0.5}
+            removeClippedSubviews={false}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={400}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="notifications-outline" size={64} color={COLORS.GRAY} />

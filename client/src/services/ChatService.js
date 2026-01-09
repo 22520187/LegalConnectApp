@@ -87,19 +87,47 @@ export const getConversationMessages = async (conversationId) => {
  */
 export const sendMessage = async (conversationId, content, role = 'USER') => {
   try {
+    console.log('📤 Sending message:', {
+      conversationId,
+      conversationIdType: typeof conversationId,
+      contentLength: content.length,
+      role
+    });
+
     const response = await apiClient.post('/conversations/messages', {
       conversationId: Number(conversationId),
       content,
       role
     });
+    
     if (response.status >= 200 && response.status < 300) {
+      console.log('✅ Message sent successfully');
       return response.data;
     } else {
-      throw new Error('Failed to send message');
+      const errorMsg = response.data?.message || response.data?.error || `HTTP ${response.status}`;
+      console.error('❌ API returned non-success status:', response.status, response.data);
+      throw new Error(errorMsg);
     }
   } catch (error) {
-    console.error('Error sending message:', error);
-    throw error;
+    console.error('❌ Error sending message:', error);
+    
+    // Log chi tiết error response
+    if (error.response) {
+      console.error('Error response status:', error.response.status);
+      console.error('Error response data:', error.response.data);
+      
+      // Trích xuất message từ error response
+      const errorMessage = error.response.data?.message || 
+                          error.response.data?.error || 
+                          error.response.data?.detail ||
+                          `HTTP ${error.response.status}: ${error.response.statusText}`;
+      
+      throw new Error(errorMessage);
+    } else if (error.request) {
+      throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+    } else {
+      throw error;
+    }
   }
 };
 
@@ -139,4 +167,5 @@ export const updateConversationTitle = async (conversationId, title) => {
     throw error;
   }
 };
+
 

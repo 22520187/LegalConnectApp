@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { LandingStackNavigator, AuthStackNavigator, UserTabNavigator, AdminTabNavigator } from './src/navigation';
+import { AuthStackNavigator, UserTabNavigator, AdminTabNavigator } from './src/navigation';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import COLORS from './src/constant/colors';
@@ -11,7 +11,7 @@ import * as Linking from 'expo-linking';
 
 // Component để render navigation dựa trên auth state và role
 const AppNavigator = () => {
-  const { isAuthenticated, user, loginWithGoogle } = useAuth();
+  const { isAuthenticated, user, loginWithGoogle, loading } = useAuth();
 
   // Xử lý deep link cho OAuth callback
   useEffect(() => {
@@ -65,9 +65,19 @@ const AppNavigator = () => {
     }
   };
 
+  // Hiển thị loading screen trong khi kiểm tra authentication
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.BLUE} />
+      </View>
+    );
+  }
+
   const getNavigator = () => {
     if (!isAuthenticated) {
-      return <LandingStackNavigator />;
+      // Khi chưa đăng nhập, hiển thị AuthStackNavigator (trang Login)
+      return <AuthStackNavigator />;
     }
     
     // Kiểm tra role của user để điều hướng
@@ -86,9 +96,6 @@ const AppNavigator = () => {
 };
 
 export default function App() {
-  // Mặc định không đăng nhập để hiển thị trang LegalDocuments trước
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
   return (
     <AuthProvider>
       <SafeAreaProvider>

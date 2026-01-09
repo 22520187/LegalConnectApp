@@ -21,10 +21,17 @@ import {
   createConversation,
   getUserConversations,
   getConversationMessages,
+  getConversationById,
   sendMessage as sendMessageToBackend,
   deleteConversation,
   updateConversationTitle,
 } from '../../services/ChatService';
+import {
+  uploadPdfToPython,
+  getPdfSummary,
+  askPdfQuestion,
+  uploadPdfToBackend,
+} from '../../services/PDFService';
 import { useAuth } from '../../context/AuthContext';
 
 const ChatBot = ({ navigation }) => {
@@ -33,7 +40,9 @@ const ChatBot = ({ navigation }) => {
   const [messages, setMessages] = useState([]);
   const [pdfMessages, setPdfMessages] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [pdfFileId, setPdfFileId] = useState(null); // Python file_id
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
@@ -73,6 +82,9 @@ const ChatBot = ({ navigation }) => {
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages([welcomeMessage]);
+      // Reset PDF state khi không có conversation
+      setSelectedFile(null);
+      setPdfFileId(null);
     }
   }, [currentConversationId]);
 
@@ -113,7 +125,43 @@ const ChatBot = ({ navigation }) => {
   const loadMessages = async (conversationId) => {
     try {
       setIsLoadingMessages(true);
+      
+      // Load conversation details để lấy thông tin PDF
+      let conversation = null;
+      try {
+        conversation = await getConversationById(conversationId);
+        if (conversation) {
+          // Cập nhật conversation trong state nếu cần
+          setConversations(prev => {
+            const existing = prev.find(c => c.id === conversationId);
+            if (!existing || !existing.pythonFileId) {
+              return prev.map(c => c.id === conversationId ? conversation : c);
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error('Error loading conversation details:', error);
+        // Fallback: tìm trong state
+        conversation = conversations.find(c => c.id === conversationId);
+      }
+      
+      // Load messages
       const msgs = await getConversationMessages(conversationId);
+      
+      // Nếu là PDF_QA conversation, setup PDF state
+      if (conversation && conversation.type === 'PDF_QA') {
+        if (conversation.pythonFileId) {
+          setPdfFileId(conversation.pythonFileId);
+        }
+        if (conversation.pdfDocument) {
+          setSelectedFile({
+            name: conversation.pdfDocument.originalFileName || 'document.pdf',
+            conversationId: conversationId,
+          });
+        }
+      }
+      
       // Convert messages từ backend format sang UI format
       const formattedMessages = msgs.map(msg => ({
         id: msg.id,
@@ -124,7 +172,13 @@ const ChatBot = ({ navigation }) => {
           minute: '2-digit' 
         }),
       }));
-      setMessages(formattedMessages);
+      
+      // Nếu là PDF_QA, set vào pdfMessages, ngược lại set vào messages
+      if (conversation && conversation.type === 'PDF_QA') {
+        setPdfMessages(formattedMessages);
+      } else {
+        setMessages(formattedMessages);
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
@@ -148,6 +202,13 @@ const ChatBot = ({ navigation }) => {
   const handleSelectConversation = (conversation) => {
     setCurrentConversationId(conversation.id);
     setShowConversationsModal(false);
+    
+    // Nếu là PDF_QA conversation, chuyển sang PDF tab
+    if (conversation.type === 'PDF_QA') {
+      setActiveTab('pdf');
+    } else {
+      setActiveTab('normal');
+    }
   };
 
   const handleEditConversationTitle = (conversation) => {
@@ -199,7 +260,7 @@ const ChatBot = ({ navigation }) => {
   const handleSendMessage = async (message) => {
     if (activeTab !== 'normal') {
       // Logic cho PDF Q&A
-      if (!selectedFile) {
+      if (!selectedFile || !pdfFileId) {
         const botMessage = {
           id: Date.now() + 1,
           message: "Bạn cần chọn file PDF trước khi đặt câu hỏi. Vui lòng tải lên file PDF để tôi có thể hỗ trợ bạn tốt hơn.",
@@ -208,15 +269,90 @@ const ChatBot = ({ navigation }) => {
         };
         setPdfMessages(prev => [...prev, botMessage]);
         scrollToBottom();
-      } else {
-        // TODO: Implement PDF Q&A API call
-        const botMessage = {
+        return;
+      }
+
+      // Đảm bảo có conversation
+      let convId = currentConversationId;
+      if (!convId && selectedFile.conversationId) {
+        convId = selectedFile.conversationId;
+        setCurrentConversationId(convId);
+      }
+
+      // Thêm tin nhắn của user vào UI ngay
+      const userMessage = {
+        id: Date.now(),
+        message: message,
+        isUser: true,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setPdfMessages(prev => [...prev, userMessage]);
+      setIsLoading(true);
+      scrollToBottom();
+
+      try {
+        // Lưu user message vào backend nếu có conversation
+        if (convId) {
+          await sendMessageToBackend(convId, message, 'USER');
+        }
+
+        // Gọi PDF Q&A API
+        const response = await askPdfQuestion(pdfFileId, message);
+
+        if (response.success) {
+          // Lưu AI response vào backend nếu có conversation
+          if (convId) {
+            await sendMessageToBackend(convId, response.answer, 'ASSISTANT');
+          }
+
+          // Thêm AI message vào UI
+          const botMessage = {
+            id: Date.now() + 1,
+            message: response.answer,
+            isUser: false,
+            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            sources: response.sources,
+          };
+          setPdfMessages(prev => [...prev, botMessage]);
+        } else {
+          throw new Error('Không nhận được phản hồi từ AI');
+        }
+      } catch (error) {
+        console.error('Error asking PDF question:', error);
+        
+        // Kiểm tra nếu lỗi liên quan đến API key
+        const errorMsg = error.message || '';
+        const isApiKeyLimitError = errorMsg.includes('API key limit') || 
+                                   errorMsg.includes('limit exceeded') ||
+                                   errorMsg.includes('quota') ||
+                                   errorMsg.includes('Unauthorized');
+        
+        if (isApiKeyLimitError) {
+          Alert.alert(
+            'Đã hết lượt sử dụng',
+            'Bạn đã sử dụng hết số lượt API miễn phí.\n\nVui lòng:\n• Nâng cấp gói để có thêm lượt\n• Hoặc chờ reset lượt (thường là hàng tháng)\n\nLiên hệ admin để biết thêm chi tiết.',
+            [{ text: 'Đóng', style: 'cancel' }]
+          );
+        }
+        
+        const errorMessage = {
           id: Date.now() + 1,
-          message: "Tính năng hỏi đáp PDF đang được phát triển. Vui lòng sử dụng tab 'Hỏi đáp thường'.",
+          message: isApiKeyLimitError
+            ? '❌ Đã hết lượt sử dụng API. Vui lòng nâng cấp gói hoặc chờ reset lượt.'
+            : errorMsg || 'Xin lỗi, đã có lỗi xảy ra khi xử lý câu hỏi của bạn. Vui lòng thử lại sau.',
           isUser: false,
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         };
-        setPdfMessages(prev => [...prev, botMessage]);
+        setPdfMessages(prev => [...prev, errorMessage]);
+        
+        if (!isApiKeyLimitError && (errorMsg.includes('kết nối') || errorMsg.includes('failed') || errorMsg.includes('network'))) {
+          Alert.alert(
+            'Lỗi kết nối',
+            'Không thể kết nối đến server AI. Vui lòng kiểm tra:\n- Kết nối mạng\n- Server AI đang chạy\n- URL API đúng'
+          );
+        }
+      } finally {
+        setIsLoading(false);
         scrollToBottom();
       }
       return;
@@ -304,16 +440,103 @@ const ChatBot = ({ navigation }) => {
     }
   };
 
-  const handleFileSelected = (file) => {
-    setSelectedFile(file);
-    if (file) {
-      const fileMessage = {
-        id: Date.now(),
-        message: `✅ Đã tải lên file: ${file.name}\nBây giờ bạn có thể đặt câu hỏi dựa trên nội dung file này.`,
-        isUser: false,
-        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setPdfMessages(prev => [...prev, fileMessage]);
+  const handleFileSelected = async (file) => {
+    if (!file) {
+      setSelectedFile(null);
+      setPdfFileId(null);
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    // Thêm loading message (định nghĩa trước try để có thể dùng trong catch)
+    const loadingMessageId = Date.now();
+    const loadingMessage = {
+      id: loadingMessageId,
+      message: `📤 Đang tải lên file: ${file.name}...`,
+      isUser: false,
+      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setPdfMessages(prev => [...prev, loadingMessage]);
+    scrollToBottom();
+    
+    try {
+
+      // Bước 1: Upload PDF lên Python API
+      console.log('Step 1: Uploading to Python API...');
+      const pythonResult = await uploadPdfToPython(file);
+      const fileId = pythonResult.file_id;
+      
+      if (!fileId) {
+        throw new Error('Không nhận được file_id từ Python API');
+      }
+
+      // Bước 2: Lấy summary của PDF
+      console.log('Step 2: Getting PDF summary...');
+      const summaryResult = await getPdfSummary(fileId, 200);
+      const summary = summaryResult.summary || '';
+
+      // Bước 3: Upload PDF lên backend và tạo conversation
+      console.log('Step 3: Creating conversation in backend...');
+      const title = file.name.replace('.pdf', '') || 'Cuộc trò chuyện PDF';
+      const backendResult = await uploadPdfToBackend(file, title, summary, fileId);
+
+      if (backendResult.success && backendResult.conversation) {
+        const newConv = backendResult.conversation;
+        setCurrentConversationId(newConv.id);
+        setSelectedFile({ ...file, conversationId: newConv.id });
+        setPdfFileId(fileId);
+        setConversations(prev => [newConv, ...prev]);
+
+        // Xóa loading message và thêm success message
+        setPdfMessages(prev => {
+          const filtered = prev.filter(msg => msg.id !== loadingMessageId);
+          return [...filtered, {
+            id: Date.now() + 1,
+            message: `✅ Đã tải lên file thành công: ${file.name}\n\n${summary ? `Tóm tắt: ${summary}\n\n` : ''}Bây giờ bạn có thể đặt câu hỏi dựa trên nội dung file này.`,
+            isUser: false,
+            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          }];
+        });
+      } else {
+        throw new Error(backendResult.message || 'Không thể tạo conversation');
+      }
+    } catch (error) {
+      console.error('Error uploading PDF:', error);
+      
+      // Kiểm tra nếu lỗi liên quan đến API key limit
+      const errorMsg = error.message || 'Vui lòng thử lại sau.';
+      const isApiKeyLimitError = errorMsg.includes('API key limit') || 
+                                 errorMsg.includes('limit exceeded') ||
+                                 errorMsg.includes('quota');
+      
+      // Xóa loading message và thêm error message
+      setPdfMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== loadingMessageId);
+        return [...filtered, {
+          id: Date.now() + 1,
+          message: isApiKeyLimitError 
+            ? `❌ Đã hết lượt sử dụng API.\n\nBạn đã sử dụng hết số lượt miễn phí. Vui lòng:\n• Nâng cấp gói để có thêm lượt\n• Hoặc chờ reset lượt (thường là hàng tháng)\n\nLiên hệ admin để biết thêm chi tiết.`
+            : `❌ Lỗi khi tải lên file: ${errorMsg}`,
+          isUser: false,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        }];
+      });
+      
+      // Hiển thị Alert với thông tin chi tiết hơn
+      if (isApiKeyLimitError) {
+        Alert.alert(
+          'Đã hết lượt sử dụng',
+          'Bạn đã sử dụng hết số lượt API miễn phí.\n\nVui lòng:\n• Nâng cấp gói để có thêm lượt\n• Hoặc chờ reset lượt (thường là hàng tháng)\n\nLiên hệ admin để biết thêm chi tiết.',
+          [{ text: 'Đóng', style: 'cancel' }]
+        );
+      } else {
+        Alert.alert('Lỗi', `Không thể tải lên file PDF: ${errorMsg}`);
+      }
+      
+      setSelectedFile(null);
+      setPdfFileId(null);
+    } finally {
+      setIsUploadingPdf(false);
       scrollToBottom();
     }
   };
@@ -441,7 +664,7 @@ const ChatBot = ({ navigation }) => {
               ? "Hãy chọn file PDF trước..."
               : "Nhập câu hỏi của bạn..."
           }
-          disabled={activeTab === 'pdf' && !selectedFile}
+          disabled={(activeTab === 'pdf' && (!selectedFile || isUploadingPdf)) || isLoading}
         />
       </KeyboardAvoidingView>
 

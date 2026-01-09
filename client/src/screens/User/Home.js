@@ -14,8 +14,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader, FilterTabs, QuestionList, FloatingActionButton } from '../../components';
 import COLORS from '../../constant/colors';
 import ForumService from '../../services/ForumService';
+import NotificationService from '../../services/NotificationService';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Helper function to strip HTML tags and create summary
 const stripHtml = (html = '') => {
@@ -67,6 +69,7 @@ const Home = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
     const { user, logout } = useAuth();
 
     // Prevent stale requests from overwriting new tab results
@@ -117,6 +120,29 @@ const Home = ({ navigation }) => {
         };
         loadCategories();
     }, []);
+
+    // Load unread notification count
+    const loadUnreadNotificationCount = async () => {
+        try {
+            const count = await NotificationService.getUnreadCount();
+            setUnreadNotificationCount(count || 0);
+        } catch (error) {
+            console.error('Error loading unread notification count:', error);
+            setUnreadNotificationCount(0);
+        }
+    };
+
+    // Load notification count when component mounts
+    useEffect(() => {
+        loadUnreadNotificationCount();
+    }, []);
+
+    // Reload notification count when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUnreadNotificationCount();
+        }, [])
+    );
 
     const selectedCategoryName = useMemo(() => {
         if (!selectedCategoryId) return 'Tất cả';
@@ -330,6 +356,7 @@ const Home = ({ navigation }) => {
                     onNotification={handleNotification}
                     user={userDisplay}
                     onLogout={handleLogout}
+                    notificationCount={unreadNotificationCount}
                 />
                 
                 <FilterTabs

@@ -28,24 +28,35 @@ export const AuthProvider = ({ children }) => {
       const storedAuth = await AuthService.getStoredUser();
       
       if (storedAuth.isAuthenticated && storedAuth.user) {
-        // Verify với server
+        // Verify với server - bắt buộc phải verify thành công
         try {
           const currentUser = await AuthService.getCurrentUser();
           if (currentUser.success) {
             setUser(currentUser.data);
             setIsAuthenticated(true);
           } else {
+            // Nếu verify không thành công, xóa stored auth và giữ trạng thái chưa đăng nhập
             await AuthService.clearStoredAuth();
+            setUser(null);
+            setIsAuthenticated(false);
           }
         } catch (error) {
-          // Nếu không thể verify với server, vẫn sử dụng stored data
-          setUser(storedAuth.user);
-          setIsAuthenticated(true);
+          // Nếu có lỗi khi verify (401, network error, etc.), xóa stored auth
+          console.error('Auth verification failed:', error);
+          await AuthService.clearStoredAuth();
+          setUser(null);
+          setIsAuthenticated(false);
         }
+      } else {
+        // Không có stored auth, đảm bảo trạng thái là chưa đăng nhập
+        setUser(null);
+        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error('Initialize auth error:', error);
       await AuthService.clearStoredAuth();
+      setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
