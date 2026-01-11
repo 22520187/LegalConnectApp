@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,8 @@ const Search = ({ navigation }) => {
   const [recentSearches, setRecentSearches] = useState([]);
   const [popularTags, setPopularTags] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const debounceTimeoutRef = useRef(null);
+  const requestIdRef = useRef(0);
 
   // Load search history and popular tags on mount
   useEffect(() => {
@@ -85,13 +87,28 @@ const Search = ({ navigation }) => {
   };
 
   useEffect(() => {
+    // Clear previous debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
     if (searchQuery.trim().length > 0) {
-      performSearch(searchQuery);
-      setShowSuggestions(false);
+      // Debounce: wait 500ms after user stops typing before searching
+      debounceTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery);
+        setShowSuggestions(false);
+      }, 500);
     } else {
       setSearchResults([]);
       setShowSuggestions(true);
     }
+
+    // Cleanup function
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, [searchQuery, activeFilter]);
 
   // Map PostDto from API to QuestionCard format
@@ -134,6 +151,10 @@ const Search = ({ navigation }) => {
       return;
     }
 
+    // Increment request ID to track the latest request
+    requestIdRef.current += 1;
+    const currentRequestId = requestIdRef.current;
+
     setLoading(true);
     
     try {
@@ -143,16 +164,28 @@ const Search = ({ navigation }) => {
         sort: 'createdAt,desc'
       });
 
+      // Only update state if this is still the latest request
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
       // Handle paginated response
       const posts = response.content || response || [];
       const mappedResults = posts.map(mapPostToQuestion);
       
       setSearchResults(mappedResults);
     } catch (error) {
+      // Only update state if this is still the latest request
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
       console.error('Error searching posts:', error);
       setSearchResults([]);
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the latest request
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
